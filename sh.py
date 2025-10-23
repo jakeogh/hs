@@ -271,6 +271,11 @@ class ErrorReturnCodeMeta(type):
         other_bases = {b.__name__ for b in o.__bases__}
         return self.__name__ in other_bases or o.__name__ == self.__name__
 
+def _reconstruct_exception(exit_code, full_cmd, stdout, stderr, truncate):
+    """Helper for unpickling ErrorReturnCode exceptions"""
+    exc_class = get_rc_exc(exit_code)
+    return exc_class(full_cmd, stdout, stderr, truncate)
+
 
 class ErrorReturnCode(Exception):
     __metaclass__ = ErrorReturnCodeMeta
@@ -296,8 +301,8 @@ class ErrorReturnCode(Exception):
     it's not much of a savings, but i believe it makes the code easier to read """
 
     truncate_cap = 750
-
     def __reduce__(self):
+        return (_reconstruct_exception, (self.exit_code, self.full_cmd, self.stdout, self.stderr, self.truncate))
         return self.__class__, (self.full_cmd, self.stdout, self.stderr, self.truncate)
 
     def __init__(self, full_cmd, stdout, stderr, truncate=True):
@@ -507,30 +512,6 @@ def _which(program, paths=None):
                 break
 
     return found_path
-
-
-def resolve_command_path(program):
-    path = _which(program)
-    if not path:
-        # our actual command might have a dash in it, but we can't call
-        # that from python (we have to use underscores), so we'll check
-        # if a dash version of our underscore command exists and use that
-        # if it does
-        if "_" in program:
-            path = _which(program.replace("_", "-"))
-        if not path:
-            return None
-    return path
-
-
-def resolve_command(name, command_cls, baked_args=None):
-    path = resolve_command_path(name)
-    cmd = None
-    if path:
-        cmd = command_cls(path)
-        if baked_args:
-            cmd = cmd.bake(**baked_args)
-    return cmd
 
 
 class Logger:
@@ -1522,7 +1503,7 @@ def compile_args(a, kwargs, sep, prefix):
 
     with this call:
 
-        sh.ls("-l", "/tmp", color="never")
+        sh.Command('ls')("-l", "/tmp", color="never")
 
     this function receives
 
@@ -1573,7 +1554,7 @@ def _aggregate_keywords(keywords, sep, prefix, raw=False):
     name alone, or whether we should replace "_" with "-".  if we pass in a
     dictionary, like this:
 
-        sh.command({"some_option": 12})
+        sh.Command('command')({"some_option": 12})
 
     then `raw` gets set to True, because we want to leave the key as-is, to
     produce:
@@ -3320,365 +3301,4 @@ def pushd(path):
         os.chdir(orig_path)
 
 
-@contextmanager
-def _args(**kwargs):
-    """allows us to temporarily override all the special keyword parameters in
-    a with context"""
 
-    kwargs_str = ",".join([f"{k}={v!r}" for k, v in kwargs.items()])
-
-    raise DeprecationWarning(
-        f"""
-
-sh.args() has been deprecated because it was never thread safe.  use the
-following instead:
-
-    sh2 = sh({kwargs_str})
-    sh2.your_command()
-
-or
-
-    sh2 = sh({kwargs_str})
-    from sh2 import your_command
-    your_command()
-
-"""
-    )
-
-
-class Environment(dict):
-    """this allows lookups to names that aren't found in the global scope to be
-    searched for as a program name.  for example, if "ls" isn't found in this
-    module's scope, we consider it a system program and try to find it.
-
-    we use a dict instead of just a regular object as the base class because the
-    exec() statement used in the run_repl requires the "globals" argument to be a
-    dictionary"""
-
-    # this is a list of all of the names that the sh module exports that will
-    # not resolve to functions.  we don't want to accidentally shadow real
-    # commands with functions/imports that we define in sh.py.  for example,
-    # "import time" may override the time system program
-    allowlist = {
-        "Command",
-        "RunningCommand",
-        "CommandNotFound",
-        "DEFAULT_ENCODING",
-        "DoneReadingForever",
-        "ErrorReturnCode",
-        "NotYetReadyToRead",
-        "SignalException",
-        "ForkException",
-        "TimeoutException",
-        "StreamBufferer",
-        "_aggregate_keywords",
-        "__project_url__",
-        "__version__",
-        "__file__",
-        "_args",
-        "pushd",
-        "glob",
-        "contrib",
-    }
-
-    def __init__(self, globs, baked_args=None):
-        """baked_args are defaults for the 'sh' execution context.  for
-        example:
-
-            tmp = sh(_out=StringIO())
-
-        'out' would end up in here as an entry in the baked_args dict"""
-        super(dict, self).__init__()
-        self.globs = globs
-        self.baked_args = baked_args or {}
-
-    def __getitem__(self, k):
-        if k == "args":
-            # Let the deprecated '_args' context manager be imported as 'args'
-            k = "_args"
-
-        # if we're trying to import something real, see if it's in our global scope.
-        # what defines "real" is that it's in our allowlist
-        if k in self.allowlist:
-            return self.globs[k]
-
-        # somebody tried to be funny and do "from sh import *"
-        if k == "__all__":
-            warnings.warn(
-                "Cannot import * from sh. Please import sh or import programs "
-                "individually."
-            )
-            return []
-
-        # check if we're naming a dynamically generated ReturnCode exception
-        exc = get_exc_from_name(k)
-        if exc:
-            return exc
-
-        # https://github.com/ipython/ipython/issues/2577
-        # https://github.com/amoffat/sh/issues/97#issuecomment-10610629
-        if k.startswith("__") and k.endswith("__"):
-            raise AttributeError
-
-        # is it a command?
-        cmd = resolve_command(k, self.globs[Command.__name__], self.baked_args)
-        if cmd:
-            return cmd
-
-        # is it a custom builtin?
-        builtin = getattr(self, "b_" + k, None)
-        if builtin:
-            return builtin
-
-        # how about an environment variable?
-        # this check must come after testing if its a command, because on some
-        # systems, there are an environment variables that can conflict with
-        # command names.
-        # https://github.com/amoffat/sh/issues/238
-        try:
-            return os.environ[k]
-        except KeyError:
-            pass
-
-        # nothing found, raise an exception
-        raise CommandNotFound(k)
-
-    # Methods that begin with "b_" are implementations of shell built-ins that
-    # people are used to, but which may not have an executable equivalent.
-    @staticmethod
-    def b_which(program, paths=None):
-        return _which(program, paths)
-
-
-class Contrib(ModuleType):  # pragma: no cover
-    @classmethod
-    def __call__(cls, name):
-        def wrapper1(fn):
-            @property
-            def cmd_getter(self):
-                cmd = resolve_command(name, Command)
-
-                if not cmd:
-                    raise CommandNotFound(name)
-
-                new_cmd = fn(cmd)
-                return new_cmd
-
-            setattr(cls, name, cmd_getter)
-            return fn
-
-        return wrapper1
-
-
-mod_name = __name__ + ".contrib"
-contrib = Contrib(mod_name)
-sys.modules[mod_name] = contrib
-
-
-@contrib("git")
-def git(orig):  # pragma: no cover
-    """most git commands play nicer without a TTY"""
-    cmd = orig.bake(_tty_out=False)
-    return cmd
-
-
-@contrib("bash")
-def bash(orig):
-    cmd = orig.bake("-c")
-    return cmd
-
-
-@contrib("sudo")
-def sudo(orig):  # pragma: no cover
-    """a nicer version of sudo that uses getpass to ask for a password, or
-    allows the first argument to be a string password"""
-
-    prompt = f"[sudo] password for {getpass.getuser()}: "
-
-    def stdin():
-        pw = getpass.getpass(prompt=prompt) + "\n"
-        yield pw
-
-    def process(a, kwargs):
-        password = kwargs.pop("password", None)
-
-        if password is None:
-            pass_getter = stdin()
-        else:
-            pass_getter = password.rstrip("\n") + "\n"
-
-        kwargs["_in"] = pass_getter
-        return a, kwargs
-
-    cmd = orig.bake("-S", _arg_preprocess=process)
-    return cmd
-
-
-@contrib("ssh")
-def ssh(orig):  # pragma: no cover
-    """An ssh command for automatic password login"""
-
-    class SessionContent:
-        def __init__(self):
-            self.chars = deque(maxlen=50000)
-            self.lines = deque(maxlen=5000)
-            self.line_chars = []
-            self.last_line = ""
-            self.cur_char = ""
-
-        def append_char(self, char):
-            if char == "\n":
-                line = self.cur_line
-                self.last_line = line
-                self.lines.append(line)
-                self.line_chars = []
-            else:
-                self.line_chars.append(char)
-
-            self.chars.append(char)
-            self.cur_char = char
-
-        @property
-        def cur_line(self):
-            line = "".join(self.line_chars)
-            return line
-
-    class SSHInteract:
-        def __init__(self, prompt_match, pass_getter, out_handler, login_success):
-            self.prompt_match = prompt_match
-            self.pass_getter = pass_getter
-            self.out_handler = out_handler
-            self.login_success = login_success
-            self.content = SessionContent()
-
-            # some basic state
-            self.pw_entered = False
-            self.success = False
-
-        def __call__(self, char, stdin):
-            self.content.append_char(char)
-
-            if self.pw_entered and not self.success:
-                self.success = self.login_success(self.content)
-
-            if self.success:
-                return self.out_handler(self.content, stdin)
-
-            if self.prompt_match(self.content):
-                password = self.pass_getter()
-                stdin.put(password + "\n")
-                self.pw_entered = True
-
-    def process(a, kwargs):
-        real_out_handler = kwargs.pop("interact")
-        password = kwargs.pop("password", None)
-        login_success = kwargs.pop("login_success", None)
-        prompt_match = kwargs.pop("prompt", None)
-        prompt = "Please enter SSH password: "
-
-        if prompt_match is None:
-
-            def prompt_match(content):
-                return content.cur_line.endswith("password: ")  # noqa: E731
-
-        if password is None:
-
-            def pass_getter():
-                return getpass.getpass(prompt=prompt)  # noqa: E731
-
-        else:
-
-            def pass_getter():
-                return password.rstrip("\n")  # noqa: E731
-
-        if login_success is None:
-
-            def login_success(content):
-                return True  # noqa: E731
-
-        kwargs["_out"] = SSHInteract(
-            prompt_match, pass_getter, real_out_handler, login_success
-        )
-        return a, kwargs
-
-    cmd = orig.bake(
-        _out_bufsize=0, _tty_in=True, _unify_ttys=True, _arg_preprocess=process
-    )
-    return cmd
-
-
-def run_repl(env):  # pragma: no cover
-    print(f"\n>> sh v{__version__}\n>> https://github.com/amoffat/sh\n")
-
-    while True:
-        try:
-            line = input("sh> ")
-        except (ValueError, EOFError):
-            break
-
-        try:
-            exec(compile(line, "<dummy>", "single"), env, env)
-        except SystemExit:
-            break
-        except:  # noqa: E722
-            print(traceback.format_exc())
-
-    # cleans up our last line
-    print("")
-
-
-# this is a thin wrapper around THIS module (we patch sys.modules[__name__]).
-# this is in the case that the user does a "from sh import whatever"
-# in other words, they only want to import certain programs, not the whole
-# system PATH worth of commands.  in this case, we just proxy the
-# import lookup to our Environment class
-class SelfWrapper(ModuleType):
-    def __init__(self, self_module, baked_args=None):
-        # this is super ugly to have to copy attributes like this,
-        # but it seems to be the only way to make reload() behave
-        # nicely.  if i make these attributes dynamic lookups in
-        # __getattr__, reload sometimes chokes in weird ways...
-        super().__init__(
-            name=getattr(self_module, "__name__", None),
-            doc=getattr(self_module, "__doc__", None),
-        )
-        for attr in ["__builtins__", "__file__", "__package__"]:
-            setattr(self, attr, getattr(self_module, attr, None))
-
-        # python 3.2 (2.7 and 3.3 work fine) breaks on osx (not ubuntu)
-        # if we set this to None.  and 3.3 needs a value for __path__
-        self.__path__ = []
-        self.__self_module = self_module
-
-        # Copy the Command class and add any baked call kwargs to it
-        command_cls = Command
-        cls_attrs = command_cls.__dict__.copy()
-        cls_attrs.pop("__dict__", None)
-        if baked_args:
-            call_args, _ = command_cls._extract_call_args(baked_args)
-            cls_attrs["_call_args"] = cls_attrs["_call_args"].copy()
-            cls_attrs["_call_args"].update(call_args)
-        globs = globals().copy()
-        globs[command_cls.__name__] = type(
-            command_cls.__name__, command_cls.__bases__, cls_attrs
-        )
-
-        self.__env = Environment(globs, baked_args=baked_args)
-
-    def __getattr__(self, name):
-        return self.__env[name]
-
-    def bake(self, **kwargs):
-        baked_args = self.__env.baked_args.copy()
-        baked_args.update(kwargs)
-        new_sh = self.__class__(self.__self_module, baked_args)
-        return new_sh
-
-
-if __name__ == "__main__":  # pragma: no cover
-    # we're being run as a stand-alone script
-    env = Environment(globals())
-    run_repl(env)
-else:
-    # we're being imported from somewhere
-    sys.modules[__name__] = SelfWrapper(sys.modules[__name__])
