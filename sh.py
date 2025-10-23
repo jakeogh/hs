@@ -1304,8 +1304,8 @@ class Command:
         if name.startswith("_"):
             val = get_attr(name)
 
-        elif name == "bake":
-            val = get_attr("bake")
+        elif name in ("bake", "rebake"):
+            val = get_attr(name)
 
         # here we have a way of getting past shadowed subcommands.  for example,
         # if "git bake" was a thing, we wouldn't be able to do `git.bake()`
@@ -1314,7 +1314,7 @@ class Command:
             name = name[:-1]
 
         if val is None:
-            val = get_attr("bake")(name)
+            val = get_attr("rebake")(name)
 
         return val
 
@@ -1348,15 +1348,13 @@ class Command:
 
         return call_args, kwargs
 
-    def bake(self, *args, **kwargs):
-        """returns a new Command object after baking(freezing) the given
-        command arguments which are used automatically when its exec'ed
+    def rebake(self, *args, **kwargs):
+        """returns a new Command object with the given arguments baked in.
 
-        special keyword arguments can be temporary baked and additionally be
-        overridden in __call__ or in subsequent bakes (basically setting
-        defaults)"""
+        Use this when you want to create variants from a base command.
+        For in-place modification, use bake() instead."""
 
-        # construct the base Command
+        # construct a new Command
         fn = type(self)(self._path)
         fn._partial = True
 
@@ -1369,6 +1367,22 @@ class Command:
         prefix = call_args.get("long_prefix", self._call_args["long_prefix"])
         fn._partial_baked_args.extend(compile_args(args, kwargs, sep, prefix))
         return fn
+
+    def bake(self, *args, **kwargs):
+        """bakes (freezes) the given command arguments into this Command,
+        which are used automatically when it's exec'ed.
+
+        Modifies this Command in-place. Returns None to prevent old assignment pattern."""
+
+        call_args, kwargs = self._extract_call_args(kwargs)
+
+        self._partial = True
+        self._partial_call_args.update(call_args)
+        sep = call_args.get("long_sep", self._call_args["long_sep"])
+        prefix = call_args.get("long_prefix", self._call_args["long_prefix"])
+        self._partial_baked_args.extend(compile_args(args, kwargs, sep, prefix))
+
+        return None
 
     def __str__(self):
         baked_args = " ".join(self._partial_baked_args)

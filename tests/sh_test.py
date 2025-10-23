@@ -99,9 +99,9 @@ system_python = sh.Command(sys.executable)
 # module, and not the system one
 baked_env = os.environ.copy()
 append_module_path(baked_env, sh)
-python = system_python.bake(_env=baked_env, _return_cmd=True)
-pythons = python.bake(_return_cmd=False)
-python_bg = system_python.bake(_env=baked_env, _bg=True)
+python = system_python.rebake(_env=baked_env, _return_cmd=True)
+pythons = python.rebake(_return_cmd=False)
+python_bg = system_python.rebake(_env=baked_env, _bg=True)
 
 
 def requires_progs(*progs):
@@ -987,7 +987,7 @@ print(sys.argv[1])
 
         # test baking too
         correct = "--long-option=baked=underscore"
-        python_baked = python.bake(py.name, opt, _long_sep="=baked=")
+        python_baked = python.rebake(py.name, opt, _long_sep="=baked=")
         out = python_baked().strip()
         self.assertEqual(out, correct)
 
@@ -1020,12 +1020,12 @@ print(sys.argv[1])
         self.assertEqual(out, "-custom-long-option")
 
         # test baking too
-        out = python.bake(
+        out = python.rebake(
             py.name, {"long-option": "underscore"}, _long_prefix="-baked-"
         )().strip()
         self.assertEqual(out, "-baked-long-option=underscore")
 
-        out = python.bake(
+        out = python.rebake(
             py.name, {"long-option": True}, _long_prefix="-baked-"
         )().strip()
         self.assertEqual(out, "-baked-long-option")
@@ -1079,7 +1079,7 @@ subprocess.Popen(sys.argv[1:], shell=False).wait()
 """
         )
 
-        cmd1 = python.bake(py.name, _with=True)
+        cmd1 = python.rebake(py.name, _with=True)
         with cmd1:
             out = whoami()
         self.assertIn("with_context", out)
@@ -1115,8 +1115,8 @@ if options.opt:
 
     def test_with_context_nested(self):
         echo_path = sh.Command("echo")._path
-        with sh.Command("echo").bake("test1", _with=True):
-            with sh.Command("echo").bake("test2", _with=True):
+        with sh.Command("echo").rebake("test1", _with=True):
+            with sh.Command("echo").rebake("test2", _with=True):
                 out = sh.Command("echo")("test3")
         self.assertEqual(out.strip(), f"test1 {echo_path} test2 {echo_path} test3")
 
@@ -1345,7 +1345,7 @@ subprocess.Popen(sys.argv[1:], shell=False).wait()
 """
         )
 
-        cmd1 = python.bake(py.name)
+        cmd1 = python.rebake(py.name)
         out = cmd1.whoami()
         self.assertIn("subcommand", out)
         self.assertIn(getpass.getuser(), out)
@@ -1358,7 +1358,7 @@ sys.stdout.write(str(sys.argv[1:]))
 """
         )
 
-        out = python.bake(py.name).bake("bake1").bake("bake2")()
+        out = python.rebake(py.name).rebake("bake1").rebake("bake2")()
         self.assertEqual("['bake1', 'bake2']", str(out))
 
     def test_arg_preprocessor(self):
@@ -1374,14 +1374,14 @@ sys.stdout.write(str(sys.argv[1:]))
             kwargs["a-kwarg"] = 123
             return args, kwargs
 
-        cmd = pythons.bake(py.name, _arg_preprocess=arg_preprocess)
+        cmd = pythons.rebake(py.name, _arg_preprocess=arg_preprocess)
         out = cmd("arg")
         self.assertEqual("['preprocessed', 'arg', '--a-kwarg=123']", out)
 
     def test_bake_args_come_first(self):
         ls = sh.Command('ls')
 
-        ls = ls.bake(h=True)
+        ls = ls.rebake(h=True)
 
         ran = ls("-la", _return_cmd=True).ran
         ft = ran.index("-h")
@@ -2075,9 +2075,9 @@ sys.stdout.write(sys.argv[1])
     def test_cmd_eq(self):
         py = create_tmp_test("")
 
-        cmd1 = python.bake(py.name, "-u")
-        cmd2 = python.bake(py.name, "-u")
-        cmd3 = python.bake(py.name)
+        cmd1 = python.rebake(py.name, "-u")
+        cmd2 = python.rebake(py.name, "-u")
+        cmd3 = python.rebake(py.name)
 
         self.assertEqual(cmd1, cmd2)
         self.assertNotEqual(cmd1, cmd3)
@@ -2683,7 +2683,7 @@ p.wait()
     def test_baked_command_can_be_printed(self):
         ls = sh.Command('ls')
 
-        ll = ls.bake("-l")
+        ll = ls.rebake("-l")
         self.assertTrue(str(ll).endswith("/ls -l"))
 
     # https://github.com/amoffat/sh/issues/185
@@ -3009,7 +3009,7 @@ import sys
 sys.stdout.write(sys.argv[1])
 """
         )
-        out = pythons.bake(py.name).bake_()
+        out = pythons.rebake(py.name).bake_()
         self.assertEqual("bake", out)
 
     def test_no_proc_no_attr(self):
@@ -3195,7 +3195,7 @@ sys.exit(1)
                 continue
             sig_exception_name = f"SignalException_{sig}"
             sig_exception = sh.get_rc_exc(-sig)
-            python_bg_no_sig_exception = python_bg.bake(_ok_code=[-sig])
+            python_bg_no_sig_exception = python_bg.rebake(_ok_code=[-sig])
             try:
                 p = python_bg_no_sig_exception(py.name)
                 time.sleep(0.5)
@@ -3416,8 +3416,8 @@ sys.stdout.write(repr(res))
 """
         )
 
-        p1 = python.bake("-u", py.name, 1)
-        p2 = python.bake("-u", py.name, 2)
+        p1 = python.rebake("-u", py.name, 1)
+        p2 = python.rebake("-u", py.name, 2)
         results = [None, None]
 
         def f1():
@@ -3493,15 +3493,60 @@ class StreamBuffererTests(unittest.TestCase):
         self.assertEqual(b.process(b"\nthree\n"), [b"e\ntwo\nthre"])
         self.assertEqual(b.flush(), b"e\n")
 
+
+class BakeTests(unittest.TestCase):
+    def test_bake_mutates_in_place(self):
+        """Test that bake() modifies the command in place"""
+        cmd = sh.Command('echo')
+        result = cmd.bake('-n')
+        self.assertIsNone(result, "bake() should return None")
+        # Verify the arg was baked in
+        self.assertIn('-n', cmd._partial_baked_args)
+
+    def test_bake_multiple_calls(self):
+        """Test multiple bake() calls accumulate"""
+        cmd = sh.Command('echo')
+        cmd.bake('-n')
+        cmd.bake('-e')
+        self.assertIn('-n', cmd._partial_baked_args)
+        self.assertIn('-e', cmd._partial_baked_args)
+
+    def test_bake_conditional_pattern(self):
+        """Test the new conditional baking pattern"""
+        cmd = sh.Command('echo')
+        verbose = True
+        if verbose:
+            cmd.bake('-e')
+        color = False
+        if color:
+            cmd.bake('\\033[32m')
+
+        self.assertIn('-e', cmd._partial_baked_args)
+        self.assertNotIn('\\033[32m', cmd._partial_baked_args)
+
+    def test_rebake_creates_copy(self):
+        """Test that rebake() creates a new Command"""
+        base = sh.Command('echo')
+        variant1 = base.rebake('-n')
+        variant2 = base.rebake('-e')
+
+        self.assertIsNot(variant1, base)
+        self.assertIsNot(variant2, base)
+        self.assertIsNot(variant1, variant2)
+        self.assertIn('-n', variant1._partial_baked_args)
+        self.assertIn('-e', variant2._partial_baked_args)
+        self.assertEqual([], base._partial_baked_args)
+
+
 if __name__ == "__main__":
     test_kwargs = {"warnings": "ignore"}
-    
+
     # if we're running a specific test, we can let unittest framework figure out
     # that test and run it itself.  it will also handle setting the return code
     # of the process if any tests error or fail
     if len(sys.argv) > 1:
         unittest.main(**test_kwargs)
-    
+
     # otherwise, it looks like we want to run all the tests
     else:
         suite = unittest.TestLoader().loadTestsFromModule(sys.modules[__name__])
