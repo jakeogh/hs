@@ -99,7 +99,7 @@ FORCE_USE_SELECT = bool(int(os.environ.get("SH_TESTS_USE_SELECT", "0")))
 PUSHD_LOCK = threading.RLock()
 
 
-def get_num_args(fn):
+def get_num_args(fn: Any) -> int:
     return len(inspect.getfullargspec(fn).args)
 
 
@@ -271,7 +271,7 @@ class ErrorReturnCodeMeta(type):
         other_bases = {b.__name__ for b in o.__bases__}
         return self.__name__ in other_bases or o.__name__ == self.__name__
 
-def _reconstruct_exception(exit_code, full_cmd, stdout, stderr, truncate):
+def _reconstruct_exception(exit_code, full_cmd, stdout, stderr, truncate) -> "ErrorReturnCode":
     """Helper for unpickling ErrorReturnCode exceptions"""
     exc_class = get_rc_exc(exit_code)
     return exc_class(full_cmd, stdout, stderr, truncate)
@@ -378,7 +378,7 @@ SIGNAL_MAPPING = {
 }
 
 
-def get_exc_from_name(name):
+def get_exc_from_name(name: str) -> type[ErrorReturnCode]:
     """takes an exception name, like:
 
         ErrorReturnCode_1
@@ -410,7 +410,7 @@ def get_exc_from_name(name):
     return exc
 
 
-def get_rc_exc(rc):
+def get_rc_exc(rc: int) -> type[ErrorReturnCode]:
     """takes a exit code or negative signal number and produces an exception
     that corresponds to that return code.  positive return codes yield
     ErrorReturnCode exception, negative return codes yield SignalException
@@ -458,7 +458,7 @@ class GlobResults(list):
         list.__init__(self, results)
 
 
-def glob(path, *args, **kwargs):
+def glob(path: str, *args: Any, **kwargs: Any) -> list[str]:
     expanded = GlobResults(path, _old_glob(path, *args, **kwargs))
     return expanded
 
@@ -466,11 +466,11 @@ def glob(path, *args, **kwargs):
 glob_module.glob = glob  # type: ignore
 
 
-def canonicalize(path):
+def canonicalize(path: str) -> str:
     return os.path.abspath(os.path.expanduser(path))
 
 
-def _which(program, paths=None):
+def _which(program: str, paths: list[str] | None = None) -> str:
     """takes a program name or full path, plus an optional collection of search
     paths, and returns the full path of the requested executable.  if paths is
     specified, it is the entire list of search paths, and the PATH env is not

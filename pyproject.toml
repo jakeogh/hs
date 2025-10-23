@@ -36,6 +36,7 @@ include = [
     { path = "tests", format = "sdist" },
     { path = "tox.ini", format = "sdist" },
     { path = "LICENSE.txt", format = "sdist" },
+    { path = "py.typed" },
 ]
 
 [tool.poetry.dependencies]
