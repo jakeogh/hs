@@ -302,7 +302,6 @@ class ErrorReturnCode(Exception):
     truncate_cap = 750
     def __reduce__(self):
         return (_reconstruct_exception, (self.exit_code, self.full_cmd, self.stdout, self.stderr, self.truncate))
-        return self.__class__, (self.full_cmd, self.stdout, self.stderr, self.truncate)
 
     def __init__(self, full_cmd, stdout, stderr, truncate=True):
         self.exit_code = self.exit_code  # makes pylint happy
@@ -1348,13 +1347,15 @@ class Command:
 
         return call_args, kwargs
 
-    def rebake(self, *args, **kwargs):
-        """returns a new Command object with the given arguments baked in.
+    def rebake(self, *args, **kwargs) -> "Command":
+        """returns a new Command object after baking(freezing) the given
+        command arguments which are used automatically when its exec'ed
 
-        Use this when you want to create variants from a base command.
-        For in-place modification, use bake() instead."""
+        special keyword arguments can be temporary baked and additionally be
+        overridden in __call__ or in subsequent bakes (basically setting
+        defaults)"""
 
-        # construct a new Command
+        # construct the base Command
         fn = type(self)(self._path)
         fn._partial = True
 
@@ -1368,7 +1369,7 @@ class Command:
         fn._partial_baked_args.extend(compile_args(args, kwargs, sep, prefix))
         return fn
 
-    def bake(self, *args, **kwargs):
+    def bake(self, *args, **kwargs) -> None:
         """bakes (freezes) the given command arguments into this Command,
         which are used automatically when it's exec'ed.
 
