@@ -73,7 +73,7 @@ from locale import getpreferredencoding
 from queue import Empty, Queue
 from shlex import quote as shlex_quote
 from types import GeneratorType, ModuleType
-from typing import Any, Dict, Type, Union
+from typing import Any
 
 __project_url__ = "https://github.com/amoffat/sh"
 
@@ -278,7 +278,6 @@ def _reconstruct_exception(exit_code, full_cmd, stdout, stderr, truncate):
 
 
 class ErrorReturnCode(Exception):
-    __metaclass__ = ErrorReturnCodeMeta
 
     """ base class for all exceptions as a result of a command's exit status
     being deemed an error.  this base class is dynamically subclassed into
