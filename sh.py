@@ -241,7 +241,7 @@ class SelectPoller:
 # by zhangyafeikimi when he discovered that if the fds created internally by sh
 # numbered > 1024, select.select failed (a limitation of select.select).  this
 # can happen if your script opens a lot of files
-Poller: Union[Type[SelectPoller], Type[PollPoller]] = SelectPoller
+Poller: type[SelectPoller] | type[PollPoller] = SelectPoller
 if HAS_POLL and not FORCE_USE_SELECT:
     Poller = PollPoller
 
@@ -372,7 +372,7 @@ class CommandNotFound(AttributeError):
 
 
 rc_exc_regex = re.compile(r"(ErrorReturnCode|SignalException)_((\d+)|SIG[a-zA-Z]+)")
-rc_exc_cache: Dict[str, Type[ErrorReturnCode]] = {}
+rc_exc_cache: dict[str, type[ErrorReturnCode]] = {}
 
 SIGNAL_MAPPING = {
     v: k for k, v in signal.__dict__.items() if re.match(r"SIG[a-zA-Z]+", k)
@@ -1155,7 +1155,7 @@ class Command:
     thread_local = threading.local()
     RunningCommandCls = RunningCommand
 
-    _call_args: Dict[str, Any] = {
+    _call_args: dict[str, Any] = {
         "fg": False,  # run command in foreground
         # run a command in the background.  commands run in the background
         # ignore SIGHUP and do not automatically exit when the parent process
