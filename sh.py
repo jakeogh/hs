@@ -1302,28 +1302,6 @@ class Command:
         self._path = found
         self.__name__ = str(self)
 
-    def __getattribute__(self, name):
-        # convenience
-        get_attr = partial(object.__getattribute__, self)
-        val = None
-
-        if name.startswith("_"):
-            val = get_attr(name)
-
-        elif name in ("bake", "rebake"):
-            val = get_attr(name)
-
-        # here we have a way of getting past shadowed subcommands.  for example,
-        # if "git bake" was a thing, we wouldn't be able to do `git.bake()`
-        # because `.bake()` is already a method.  so we allow `git.bake_()`
-        elif name.endswith("_"):
-            name = name[:-1]
-
-        if val is None:
-            val = get_attr("rebake")(name)
-
-        return val
-
     @classmethod
     def _extract_call_args(cls, kwargs):
         """takes kwargs that were passed to a command's __call__ and extracts
