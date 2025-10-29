@@ -362,6 +362,13 @@ SIGNALS_THAT_SHOULD_THROW_EXCEPTION = {
 }
 
 
+def __getattr__(name: str):
+    """Module-level __getattr__ for ErrorReturnCode_X dynamic classes"""
+    if name.startswith("ErrorReturnCode_"):
+        return get_exc_from_name(name)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+
 # we subclass AttributeError because:
 # https://github.com/ipython/ipython/issues/2577
 # https://github.com/amoffat/sh/issues/97#issuecomment-10610629
