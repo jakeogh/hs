@@ -3616,3 +3616,22 @@ def pushd(path):
         yield
     finally:
         os.chdir(orig_path)
+
+
+# Eagerly populate all ErrorReturnCode_X and SignalException_X classes
+# so static analyzers can see them as real module attributes
+def _populate_exception_classes():
+    g = globals()
+
+    # ErrorReturnCode_0 through ErrorReturnCode_255
+    for code in range(256):
+        name = f"ErrorReturnCode_{code}"
+        g[name] = get_rc_exc(code)
+
+    # SignalException by number and by name
+    for sig_num, sig_name in SIGNAL_MAPPING.items():
+        g[f"SignalException_{sig_num}"] = get_rc_exc(-sig_num)
+        g[f"SignalException_{sig_name}"] = get_rc_exc(-sig_num)
+
+_populate_exception_classes()
+del _populate_exception_classes
