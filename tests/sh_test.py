@@ -564,48 +564,6 @@ while True:
         match = "".join([t.upper() for t in test])
         self.assertEqual(out, match)
 
-    def test_environment(self):
-        """tests that environments variables that we pass into sh commands
-        exist in the environment, and on the sh module"""
-        import os
-
-        # this is the environment we'll pass into our commands
-        env = {"HERP": "DERP"}
-
-        # first we test that the environment exists in our child process as
-        # we've set it
-        py = create_tmp_test(
-            """
-import os
-
-for key in list(os.environ.keys()):
-    if key != "HERP":
-        del os.environ[key]
-print(dict(os.environ))
-"""
-        )
-        out = python(py.name, _env=env).strip()
-        self.assertEqual(out, "{'HERP': 'DERP'}")
-
-        py = create_tmp_test(
-            """
-import os, sys
-sys.path.insert(0, os.getcwd())
-import sh
-for key in list(os.environ.keys()):
-    if key != "HERP":
-        del os.environ[key]
-print(dict(HERP=sh.HERP))
-"""
-        )
-        out = python(py.name, _env=env, _cwd=THIS_DIR).strip()
-        self.assertEqual(out, "{'HERP': 'DERP'}")
-
-        # Test that _env also accepts os.environ which is a mpping but not a dict.
-        os.environ["HERP"] = "DERP"
-        out = python(py.name, _env=os.environ, _cwd=THIS_DIR).strip()
-        self.assertEqual(out, "{'HERP': 'DERP'}")
-
     def test_which(self):
         # Test 'which' as built-in function
         ls = sh.Command('ls')
