@@ -392,6 +392,29 @@ exit(3)
         py = create_tmp_test("exit(0)")
         self.assertRaises(ErrorReturnCode_0, python, py.name, _ok_code=2)
 
+    def test_error_return_code_dynamic():
+        """Test that ErrorReturnCode_X classes are dynamically accessible"""
+        # Test ErrorReturnCode_1 exists
+        assert hasattr(hs, 'ErrorReturnCode_1')
+        exc_class = hs.ErrorReturnCode_1
+        assert issubclass(exc_class, hs.ErrorReturnCode)
+
+        # Test catching specific exit codes
+        with pytest.raises(hs.ErrorReturnCode_1) as exc_info:
+            hs.Command("false")()
+        assert exc_info.value.exit_code == 1
+
+    def test_error_return_code_127():
+        """Test ErrorReturnCode_127 for command not found"""
+        assert hasattr(hs, 'ErrorReturnCode_127')
+        exc_127 = hs.ErrorReturnCode_127
+        assert issubclass(exc_127, hs.ErrorReturnCode)
+
+    def test_invalid_attribute_raises():
+        """Test that accessing non-ErrorReturnCode attributes raises AttributeError"""
+        with pytest.raises(AttributeError, match="module.*has no attribute"):
+            _ = hs.SomeRandomNonexistentAttribute
+
     def test_none_arg(self):
         py = create_tmp_test(
             """
@@ -1346,7 +1369,7 @@ subprocess.Popen(sys.argv[1:], shell=False).wait()
         )
 
         cmd1 = python.rebake(py.name)
-        out = cmd1.whoami()
+        out = cmd1("whoami")
         self.assertIn("subcommand", out)
         self.assertIn(getpass.getuser(), out)
 
@@ -3001,16 +3024,6 @@ sys.stdout.write(num)
         append_file.seek(0)
         output = append_file.read()
         self.assertEqual(b"12", output)
-
-    def test_shadowed_subcommand(self):
-        py = create_tmp_test(
-            """
-import sys
-sys.stdout.write(sys.argv[1])
-"""
-        )
-        out = pythons.rebake(py.name).bake_()
-        self.assertEqual("bake", out)
 
     def test_no_proc_no_attr(self):
         py = create_tmp_test("")
