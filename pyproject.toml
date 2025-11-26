@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "sh"
+name = "hs"
 version = "2.2.2"
 description = "Python subprocess replacement"
 authors = ["Andrew Moffat <arwmoffat@gmail.com>"]
