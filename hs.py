@@ -119,9 +119,6 @@ class PollPoller:
         self.fd_lookup = {}
         self.fo_lookup = {}
 
-    def __nonzero__(self):
-        return len(self.fd_lookup) != 0
-
     def __len__(self):
         return len(self.fd_lookup)
 
@@ -197,9 +194,6 @@ class SelectPoller:
         self.rlist = []
         self.wlist = []
         self.xlist = []
-
-    def __nonzero__(self):
-        return len(self.rlist) + len(self.wlist) + len(self.xlist) != 0
 
     def __len__(self):
         return len(self.rlist) + len(self.wlist) + len(self.xlist)
@@ -394,13 +388,6 @@ SIGNALS_THAT_SHOULD_THROW_EXCEPTION = {
     signal.SIGTERM,
     signal.SIGSYS,
 }
-
-
-def __getattr__(name: str):
-    """Module-level __getattr__ for ErrorReturnCode_X and SignalException_X dynamic classes"""
-    if name.startswith("ErrorReturnCode_") or name.startswith("SignalException_"):
-        return get_exc_from_name(name)
-    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
 # we subclass AttributeError because:
@@ -1353,9 +1340,6 @@ class RunningCommand:
                     return repr(self.stdout)
             return repr("")
 
-    def __long__(self):
-        return int(str(self).strip())
-
     def __float__(self):
         return float(str(self).strip())
 
@@ -1414,7 +1398,7 @@ def get_fileno(ob):
             fileno = fileno_meth()
         except UnsupportedOperation:
             pass
-    elif isinstance(ob, (int,)) and ob >= 0:
+    elif isinstance(ob, int) and ob >= 0:
         fileno = ob
 
     return fileno
@@ -3440,7 +3424,7 @@ class StreamWriter:
                 # EOF time
                 try:
                     char = termios.tcgetattr(self.stream)[6][termios.VEOF]
-                except:  # noqa: E722
+                except Exception:
                     char = chr(4).encode()
 
                 # normally, one EOF should be enough to signal to an program
