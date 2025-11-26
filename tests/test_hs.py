@@ -737,7 +737,7 @@ exit(2)
             # discovered by internal which(1)-clone
             os.makedirs(gcc_dir1)
             # an executable named gcc -- only this should be executed
-            bunk_header = "#!/bin/sh\necho $*"
+            bunk_header = "#!/bin/hs\necho $*"
             with open(gcc_file2, "w") as h:
                 h.write(bunk_header)
             os.chmod(gcc_file2, int(0o755))
@@ -870,7 +870,7 @@ print(int(sys.stdin.read()) + 1)
         self.assertEqual("17", res)
 
     def test_short_option(self):
-        sh_cmd = hs.Command('sh')
+        sh_cmd = hs.Command('hs')
 
         s1 = sh_cmd(c="echo test").strip()
         s2 = "test"
@@ -3304,7 +3304,7 @@ print("cool")
 
         buf = StringIO()
         handler = logging.StreamHandler(buf)
-        logger = logging.getLogger("sh")
+        logger = logging.getLogger("hs")
         logger.setLevel(logging.INFO)
 
         try:
