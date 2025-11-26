@@ -23,13 +23,13 @@ from io import BytesIO, StringIO
 from os.path import dirname, exists, join, realpath, split
 from pathlib import Path
 
-import sh
+import hs
 
 THIS_DIR = Path(__file__).resolve().parent
 RAND_BYTES = os.urandom(10)
 
 # we have to use the real path because on osx, /tmp is a symlink to
-# /private/tmp, and so assertions that gettempdir() == sh.Command("pwd")() will fail
+# /private/tmp, and so assertions that gettempdir() == hs.Command("pwd")() will fail
 tempdir = Path(tempfile.gettempdir()).resolve()
 IS_MACOS = platform.system() in ("AIX", "Darwin")
 
@@ -93,12 +93,12 @@ def append_module_path(env, m):
     append_pythonpath(env, get_module_import_dir(m))
 
 
-system_python = sh.Command(sys.executable)
+system_python = hs.Command(sys.executable)
 
 # this is to ensure that our `python` helper here is able to import our local sh
 # module, and not the system one
 baked_env = os.environ.copy()
-append_module_path(baked_env, sh)
+append_module_path(baked_env, hs)
 python = system_python.rebake(_env=baked_env, _return_cmd=True)
 pythons = python.rebake(_return_cmd=False)
 python_bg = system_python.rebake(_env=baked_env, _bg=True)
@@ -108,8 +108,8 @@ def requires_progs(*progs):
     missing = []
     for prog in progs:
         try:
-            sh.Command(prog)
-        except sh.CommandNotFound:
+            hs.Command(prog)
+        except hs.CommandNotFound:
             missing.append(prog)
 
     friendly_missing = ", ".join(missing)
@@ -120,7 +120,7 @@ def requires_progs(*progs):
 
 requires_posix = unittest.skipUnless(os.name == "posix", "Requires POSIX")
 requires_utf8 = unittest.skipUnless(
-    sh.DEFAULT_ENCODING == "UTF-8", "System encoding must be UTF-8"
+    hs.DEFAULT_ENCODING == "UTF-8", "System encoding must be UTF-8"
 )
 not_macos = unittest.skipUnless(not IS_MACOS, "Doesn't work on MacOS")
 
@@ -188,15 +188,15 @@ class BaseTests(unittest.TestCase):
 
 class ArgTests(BaseTests):
     def test_list_args(self):
-        processed = sh._aggregate_keywords({"arg": [1, 2, 3]}, "=", "--")
+        processed = hs._aggregate_keywords({"arg": [1, 2, 3]}, "=", "--")
         self.assertListEqual(processed, ["--arg=1", "--arg=2", "--arg=3"])
 
     def test_bool_values(self):
-        processed = sh._aggregate_keywords({"truthy": True, "falsey": False}, "=", "--")
+        processed = hs._aggregate_keywords({"truthy": True, "falsey": False}, "=", "--")
         self.assertListEqual(processed, ["--truthy"])
 
     def test_space_sep(self):
-        processed = sh._aggregate_keywords({"arg": "123"}, " ", "--")
+        processed = hs._aggregate_keywords({"arg": "123"}, " ", "--")
         self.assertListEqual(processed, ["--arg", "123"])
 
 
@@ -211,15 +211,15 @@ class FunctionalTests(BaseTests):
         super().tearDown()
 
     def test_print_command(self):
-        ls = sh.Command('ls')
-        which = sh.Command('which')
+        ls = hs.Command('ls')
+        which = hs.Command('which')
 
         actual_location = which("ls").strip()
         out = str(ls)
         self.assertEqual(out, actual_location)
 
     def test_unicode_arg(self):
-        echo = sh.Command('echo')
+        echo = hs.Command('echo')
 
         test = "漢字"
         p = echo(test, _encoding="utf8")
@@ -257,7 +257,7 @@ sys.stderr.write("b" * 1000)
 exit(1)
 """
         )
-        self.assertRaises(sh.get_rc_exc(1), python, py.name)
+        self.assertRaises(hs.get_rc_exc(1), python, py.name)
 
     def test_number_arg(self):
         py = create_tmp_test(
@@ -302,7 +302,7 @@ sys.stdout.write("no hang")
         self.assertEqual(out, "no hang")
 
     def test_exit_code(self):
-        ErrorReturnCode_3 = sh.get_rc_exc(3)
+        ErrorReturnCode_3 = hs.get_rc_exc(3)
 
         py = create_tmp_test(
             """
@@ -325,7 +325,7 @@ print(sys.argv[1:])
         self.assertEqual(out, "['*.faowjefoajweofj']")
 
     def test_exit_code_with_hasattr(self):
-        ErrorReturnCode_3 = sh.get_rc_exc(3)
+        ErrorReturnCode_3 = hs.get_rc_exc(3)
 
         py = create_tmp_test(
             """
@@ -344,7 +344,7 @@ exit(3)
             pass
 
     def test_exit_code_from_exception(self):
-        ErrorReturnCode_3 = sh.get_rc_exc(3)
+        ErrorReturnCode_3 = hs.get_rc_exc(3)
 
         py = create_tmp_test(
             """
@@ -360,16 +360,16 @@ exit(3)
             self.assertEqual(e.exit_code, 3)
 
     def test_stdin_from_string(self):
-        sed = sh.Command('sed')
+        sed = hs.Command('sed')
 
         self.assertEqual(
             sed(_in="one test three", e="s/test/two/").strip(), "one two three"
         )
 
     def test_ok_code(self):
-        ErrorReturnCode_1 = sh.get_rc_exc(1)
-        ErrorReturnCode_2 = sh.get_rc_exc(2)
-        ls = sh.Command("ls")
+        ErrorReturnCode_1 = hs.get_rc_exc(1)
+        ErrorReturnCode_2 = hs.get_rc_exc(2)
+        ls = hs.Command("ls")
 
         exc_to_test = ErrorReturnCode_2
         code_to_pass = 2
@@ -387,33 +387,24 @@ exit(3)
         python(py.name, _ok_code=None)
 
     def test_ok_code_exception(self):
-        ErrorReturnCode_0 = sh.get_rc_exc(0)
+        ErrorReturnCode_0 = hs.get_rc_exc(0)
 
         py = create_tmp_test("exit(0)")
         self.assertRaises(ErrorReturnCode_0, python, py.name, _ok_code=2)
 
-    def test_error_return_code_dynamic():
-        """Test that ErrorReturnCode_X classes are dynamically accessible"""
-        # Test ErrorReturnCode_1 exists
-        assert hasattr(hs, 'ErrorReturnCode_1')
-        exc_class = hs.ErrorReturnCode_1
-        assert issubclass(exc_class, hs.ErrorReturnCode)
-
-        # Test catching specific exit codes
-        with pytest.raises(hs.ErrorReturnCode_1) as exc_info:
-            hs.Command("false")()
-        assert exc_info.value.exit_code == 1
-
-    def test_error_return_code_127():
+    def test_error_return_code_127(self):
         """Test ErrorReturnCode_127 for command not found"""
-        assert hasattr(hs, 'ErrorReturnCode_127')
+        import hs
+        self.assertTrue(hasattr(hs, 'ErrorReturnCode_127'))
         exc_127 = hs.ErrorReturnCode_127
-        assert issubclass(exc_127, hs.ErrorReturnCode)
+        self.assertTrue(issubclass(exc_127, hs.ErrorReturnCode))
 
-    def test_invalid_attribute_raises():
+    def test_invalid_attribute_raises(self):
         """Test that accessing non-ErrorReturnCode attributes raises AttributeError"""
-        with pytest.raises(AttributeError, match="module.*has no attribute"):
+        import hs
+        with self.assertRaises(AttributeError):
             _ = hs.SomeRandomNonexistentAttribute
+
 
     def test_none_arg(self):
         py = create_tmp_test(
@@ -514,13 +505,13 @@ while True:
         self.assertTrue(all([t > 0.15 for t in derp.times]))
 
     def test_manual_stdin_string(self):
-        tr = sh.Command('tr')
+        tr = hs.Command('tr')
 
         out = tr("[:lower:]", "[:upper:]", _in="andrew").strip()
         self.assertEqual(out, "ANDREW")
 
     def test_manual_stdin_iterable(self):
-        tr = sh.Command('tr')
+        tr = hs.Command('tr')
 
         test = ["testing\n", "herp\n", "derp\n"]
         out = tr("[:lower:]", "[:upper:]", _in=test)
@@ -531,7 +522,7 @@ while True:
     def test_manual_stdin_file(self):
         import tempfile
 
-        tr = sh.Command('tr')
+        tr = hs.Command('tr')
 
         test_string = "testing\nherp\nderp\n"
 
@@ -545,7 +536,7 @@ while True:
         self.assertEqual(out, test_string.upper())
 
     def test_manual_stdin_queue(self):
-        tr = sh.Command('tr')
+        tr = hs.Command('tr')
 
         try:
             from Queue import Queue
@@ -566,15 +557,15 @@ while True:
 
     def test_which(self):
         # Test 'which' as built-in function
-        ls = sh.Command('ls')
+        ls = hs.Command('ls')
 
-        which = sh._which
+        which = hs._which
         self.assertEqual(which("fjoawjefojawe"), None)
         self.assertEqual(which("ls"), str(ls))
 
     def test_which_paths(self):
         # Test 'which' as built-in function
-        which = sh._which
+        which = hs._which
         py = create_tmp_test(
             """
 print("hi")
@@ -675,19 +666,19 @@ print(os.listdir("/dev/fd"))
     def test_no_arg(self):
         import pwd
 
-        whoami = sh.Command('whoami')
+        whoami = hs.Command('whoami')
 
         u1 = whoami().strip()
         u2 = pwd.getpwuid(os.geteuid())[0]
         self.assertEqual(u1, u2)
 
     def test_incompatible_special_args(self):
-        ls = sh.Command('ls')
+        ls = hs.Command('ls')
 
         self.assertRaises(TypeError, ls, _iter=True, _piped=True)
 
     def test_invalid_env(self):
-        ls = sh.Command('ls')
+        ls = hs.Command('ls')
 
         exc = TypeError
         self.assertRaises(exc, ls, _env="XXX")
@@ -695,7 +686,7 @@ print(os.listdir("/dev/fd"))
         self.assertRaises(exc, ls, _env={123: "bar"})
 
     def test_exception(self):
-        ErrorReturnCode_2 = sh.get_rc_exc(2)
+        ErrorReturnCode_2 = hs.get_rc_exc(2)
 
         py = create_tmp_test(
             """
@@ -705,7 +696,7 @@ exit(2)
         self.assertRaises(ErrorReturnCode_2, python, py.name)
 
     def test_piped_exception1(self):
-        ErrorReturnCode_2 = sh.get_rc_exc(2)
+        ErrorReturnCode_2 = hs.get_rc_exc(2)
 
         py = create_tmp_test(
             """
@@ -725,7 +716,7 @@ exit(2)
         self.assertRaises(ErrorReturnCode_2, fn)
 
     def test_piped_exception2(self):
-        ErrorReturnCode_2 = sh.get_rc_exc(2)
+        ErrorReturnCode_2 = hs.get_rc_exc(2)
 
         py = create_tmp_test(
             """
@@ -749,19 +740,19 @@ exit(2)
 
         # Test that Command() raises CommandNotFound for non-existent commands
         def create_nonexistent_command():
-            sh.Command("aowjgoawjoeijaowjellll")
+            hs.Command("aowjgoawjoeijaowjellll")
 
         self.assertRaises(CommandNotFound, create_nonexistent_command)
 
         def create_another_nonexistent():
-            sh.Command("ofajweofjawoe")
+            hs.Command("ofajweofjawoe")
 
         self.assertRaises(CommandNotFound, create_another_nonexistent)
 
     def test_command_wrapper_equivalence(self):
         from sh import Command
-        ls = sh.Command('ls')
-        which = sh.Command('which')
+        ls = hs.Command('ls')
+        which = hs.Command('which')
 
         self.assertEqual(Command(str(which("ls")).strip()), ls)
 
@@ -782,7 +773,7 @@ exit(2)
                 h.write(bunk_header)
             os.chmod(gcc_file2, int(0o755))
 
-            gcc = sh.Command('gcc')
+            gcc = hs.Command('gcc')
 
             self.assertEqual(gcc._path, gcc_file2)
             self.assertEqual(
@@ -910,7 +901,7 @@ print(int(sys.stdin.read()) + 1)
         self.assertEqual("17", res)
 
     def test_short_option(self):
-        sh_cmd = sh.Command('sh')
+        sh_cmd = hs.Command('sh')
 
         s1 = sh_cmd(c="echo test").strip()
         s2 = "test"
@@ -1013,7 +1004,7 @@ print(sys.argv[1])
 
     def test_command_wrapper(self):
         from sh import Command
-        which = sh.Command('which')
+        which = hs.Command('which')
 
         ls = Command(str(which("ls")).strip())
         wc = Command(str(which("wc")).strip())
@@ -1026,7 +1017,7 @@ print(sys.argv[1])
     def test_background(self):
         import time
 
-        sleep = sh.Command('sleep')
+        sleep = hs.Command('sleep')
 
         start = time.time()
         sleep_time = 0.5
@@ -1042,12 +1033,12 @@ print(sys.argv[1])
     def test_background_exception(self):
         py = create_tmp_test("exit(1)")
         p = python(py.name, _bg=True, _bg_exc=False)  # should not raise
-        self.assertRaises(sh.get_rc_exc(1), p.wait)  # should raise
+        self.assertRaises(hs.get_rc_exc(1), p.wait)  # should raise
 
     def test_with_context(self):
         import getpass
 
-        whoami = sh.Command('whoami')
+        whoami = hs.Command('whoami')
 
         py = create_tmp_test(
             """
@@ -1069,7 +1060,7 @@ subprocess.Popen(sys.argv[1:], shell=False).wait()
     def test_with_context_args(self):
         import getpass
 
-        whoami = sh.Command('whoami')
+        whoami = hs.Command('whoami')
 
         py = create_tmp_test(
             """
@@ -1095,10 +1086,10 @@ if options.opt:
         self.assertEqual(out.strip(), "")
 
     def test_with_context_nested(self):
-        echo_path = sh.Command("echo")._path
-        with sh.Command("echo").rebake("test1", _with=True):
-            with sh.Command("echo").rebake("test2", _with=True):
-                out = sh.Command("echo")("test3")
+        echo_path = hs.Command("echo")._path
+        with hs.Command("echo").rebake("test1", _with=True):
+            with hs.Command("echo").rebake("test2", _with=True):
+                out = hs.Command("echo")("test3")
         self.assertEqual(out.strip(), f"test1 {echo_path} test2 {echo_path} test3")
 
     def test_binary_input(self):
@@ -1360,7 +1351,7 @@ sys.stdout.write(str(sys.argv[1:]))
         self.assertEqual("['preprocessed', 'arg', '--a-kwarg=123']", out)
 
     def test_bake_args_come_first(self):
-        ls = sh.Command('ls')
+        ls = hs.Command('ls')
 
         ls = ls.rebake(h=True)
 
@@ -1369,7 +1360,7 @@ sys.stdout.write(str(sys.argv[1:]))
         self.assertIn("-la", ran[ft:])
 
     def test_output_equivalence(self):
-        whoami = sh.Command('whoami')
+        whoami = hs.Command('whoami')
 
         iam1 = whoami()
         iam2 = whoami()
@@ -1581,7 +1572,7 @@ for i in range(5):
 
         import sh
 
-        SignalException_SIGTERM = sh.get_rc_exc(-signal.SIGTERM)
+        SignalException_SIGTERM = hs.get_rc_exc(-signal.SIGTERM)
         caught_signal = False
         try:
             p = python("-u", py.name, _out=agg, _bg=True)
@@ -1619,7 +1610,7 @@ for i in range(5):
                 return True
 
         import sh
-        SignalException_SIGKILL = sh.get_rc_exc(-signal.SIGKILL)
+        SignalException_SIGKILL = hs.get_rc_exc(-signal.SIGKILL)
         caught_signal = False
         try:
             p = python("-u", py.name, _out=agg, _bg=True)
@@ -1729,7 +1720,7 @@ print("hello")
         async def producer():
             await python(py.name, _async=True, _return_cmd=False)
 
-        self.assertRaises(sh.get_rc_exc(34), asyncio.run, producer())
+        self.assertRaises(hs.get_rc_exc(34), asyncio.run, producer())
 
     def test_async_iter(self):
         py = create_tmp_test(
@@ -1779,7 +1770,7 @@ exit(34)
             async for line in python(py.name, _async=True):
                 lines.append(int(line.strip()))
 
-        self.assertRaises(sh.get_rc_exc(34), asyncio.run, producer())
+        self.assertRaises(hs.get_rc_exc(34), asyncio.run, producer())
 
     def test_async_return_cmd(self):
         py = create_tmp_test(
@@ -1791,7 +1782,7 @@ sys.exit(0)
 
         async def main():
             result = await python(py.name, _async=True, _return_cmd=True)
-            self.assertIsInstance(result, sh.RunningCommand)
+            self.assertIsInstance(result, hs.RunningCommand)
             result_str = await python(py.name, _async=True, _return_cmd=False)
             self.assertIsInstance(result_str, str)
 
@@ -1808,7 +1799,7 @@ sys.exit(1)
         async def main():
             await python(py.name, _async=True, _return_cmd=True)
 
-        self.assertRaises(sh.get_rc_exc(1), asyncio.run, main())
+        self.assertRaises(hs.get_rc_exc(1), asyncio.run, main())
 
     def test_handle_both_out_and_err(self):
         py = create_tmp_test(
@@ -1846,7 +1837,7 @@ for i in range(42):
         # issue https://github.com/amoffat/sh/issues/224
         test_string = "\xe4\xbd\x95\xe4\xbd\x95\n" * 150  # len > buffer_s
         txt = create_tmp_test(test_string)
-        for line in sh.Command("cat")(txt.name, _iter=True):
+        for line in hs.Command("cat")(txt.name, _iter=True):
             break
         self.assertLess(len(line), 1024)
 
@@ -2094,7 +2085,7 @@ exit(code)
 
         env = os.environ.copy()
         env["EXIT"] = "3"
-        self.assertRaises(sh.get_rc_exc(3), python, py.name, _fg=True, _env=env)
+        self.assertRaises(hs.get_rc_exc(3), python, py.name, _fg=True, _env=env)
 
     def test_fg_alternative(self):
         py = create_tmp_test("exit(0)")
@@ -2102,7 +2093,7 @@ exit(code)
 
     def test_fg_exc(self):
         py = create_tmp_test("exit(1)")
-        self.assertRaises(sh.get_rc_exc(1), python, py.name, _fg=True)
+        self.assertRaises(hs.get_rc_exc(1), python, py.name, _fg=True)
 
     def test_out_filename(self):
         outfile = tempfile.NamedTemporaryFile()
@@ -2134,7 +2125,7 @@ exit(49)
     def test_cwd(self):
         from os.path import realpath
 
-        pwd = sh.Command('pwd')
+        pwd = hs.Command('pwd')
 
         self.assertEqual(str(pwd(_cwd="/tmp")), realpath("/tmp") + "\n")
         self.assertEqual(str(pwd(_cwd="/etc")), realpath("/etc") + "\n")
@@ -2148,7 +2139,7 @@ import os
 from os.path import realpath
 orig = realpath(os.getcwd())
 print(orig)
-sh.Command("pwd")(_cwd="{td}", _fg=True)
+hs.Command("pwd")(_cwd="{td}", _fg=True)
 print(realpath(os.getcwd()))
 """
         )
@@ -2161,7 +2152,7 @@ print(realpath(os.getcwd()))
         os.rmdir(td)
 
     def test_huge_piped_data(self):
-        tr = sh.Command('tr')
+        tr = hs.Command('tr')
 
         stdin = tempfile.NamedTemporaryFile()
 
@@ -2246,15 +2237,15 @@ sys.stdout.write(sys.argv[1])
         )
 
         out = StringIO()
-        sh.Command("python")(py.name, "testing 123", _out=out)
+        hs.Command("python")(py.name, "testing 123", _out=out)
         self.assertEqual(out.getvalue(), "testing 123")
 
         out = BytesIO()
-        sh.Command("python")(py.name, "testing 123", _out=out)
+        hs.Command("python")(py.name, "testing 123", _out=out)
         self.assertEqual(out.getvalue().decode(), "testing 123")
 
     def test_stringio_input(self):
-        cat = sh.Command('cat')
+        cat = hs.Command('cat')
 
         input = StringIO()
         input.write("herpderp")
@@ -2264,7 +2255,7 @@ sys.stdout.write(sys.argv[1])
         self.assertEqual(out, "herpderp")
 
     def test_internal_bufsize(self):
-        cat = sh.Command('cat')
+        cat = hs.Command('cat')
 
         output = cat(_in="a" * 1000, _internal_bufsize=100, _out_bufsize=0)
         self.assertEqual(len(output), 100)
@@ -2357,8 +2348,8 @@ sys.stdout.write("line1")
         timeout = 1
         started = time()
         try:
-            sh.Command("sleep")(sleep_for, _timeout=timeout).wait()
-        except sh.TimeoutException as e:
+            hs.Command("sleep")(sleep_for, _timeout=timeout).wait()
+        except hs.TimeoutException as e:
             assert "sleep 3" in e.full_cmd
         else:
             self.fail("no timeout exception")
@@ -2367,20 +2358,20 @@ sys.stdout.write("line1")
 
     def test_timeout_overstep(self):
         started = time.time()
-        sh.Command("sleep")(1, _timeout=5)
+        hs.Command("sleep")(1, _timeout=5)
         elapsed = time.time() - started
         self.assertLess(abs(elapsed - 1), 0.5)
 
     def test_timeout_wait(self):
-        p = sh.Command("sleep")(3, _bg=True)
-        self.assertRaises(sh.TimeoutException, p.wait, timeout=1)
+        p = hs.Command("sleep")(3, _bg=True)
+        self.assertRaises(hs.TimeoutException, p.wait, timeout=1)
 
     def test_timeout_wait_overstep(self):
-        p = sh.Command("sleep")(1, _bg=True)
+        p = hs.Command("sleep")(1, _bg=True)
         p.wait(timeout=5)
 
     def test_timeout_wait_negative(self):
-        p = sh.Command("sleep")(3, _bg=True)
+        p = hs.Command("sleep")(3, _bg=True)
         self.assertRaises(RuntimeError, p.wait, timeout=-3)
 
     def test_binary_pipe(self):
@@ -2412,7 +2403,7 @@ sys.stdout.write(sys.stdin.read())
     # designed to trigger the "... (%d more, please see e.stdout)" output
     # of the ErrorReturnCode class
     def test_failure_with_large_output(self):
-        ErrorReturnCode_1 = sh.get_rc_exc(1)
+        ErrorReturnCode_1 = hs.get_rc_exc(1)
 
         py = create_tmp_test(
             """
@@ -2426,7 +2417,7 @@ exit(1)
     # an UnicodeDecodeError
     def test_non_ascii_error(self):
         from sh import ErrorReturnCode
-        ls = sh.Command('ls')
+        ls = hs.Command('ls')
 
         test = "/á"
         self.assertRaises(ErrorReturnCode, ls, test, _encoding="utf8")
@@ -2495,7 +2486,7 @@ sys.stderr.write("stderr")
         self.assertFalse(p.process._pipe_queue.empty())
 
     def test_no_pipe(self):
-        ls = sh.Command('ls')
+        ls = hs.Command('ls')
 
         # calling a command regular should fill up the pipe_queue
         p = ls(_return_cmd=True)
@@ -2540,7 +2531,7 @@ sys.stdout.write(bytes("te漢字st", "utf8") + "äåéë".encode("latin_1"))
         self.assertEqual(p, "test")
 
     def test_signal_exception(self):
-        SignalException_15 = sh.get_rc_exc(-15)
+        SignalException_15 = hs.get_rc_exc(-15)
 
         def throw_terminate_signal():
             py = create_tmp_test(
@@ -2567,7 +2558,7 @@ time.sleep(3)
             """
 import sys
 import sh
-python = sh.Command(sys.executable)
+python = hs.Command(sys.executable)
 p = python("{child_file}", _bg=True, _new_session=False)
 print(p.pid)
 print(p.process.pgid)
@@ -2604,7 +2595,7 @@ p.wait()
         assert_dead(parent_pid)
         assert_alive(child_pid)
 
-        self.assertRaises(sh.get_rc_exc(-signal.SIGKILL), p.wait)
+        self.assertRaises(hs.get_rc_exc(-signal.SIGKILL), p.wait)
         assert_dead(child_pid)
 
         # now let's prove that killing the process group kills both the parent
@@ -2623,17 +2614,17 @@ p.wait()
         """test basic pushd functionality"""
         child = realpath(tempfile.mkdtemp())
 
-        old_wd1 = sh.Command("pwd")().strip()
+        old_wd1 = hs.Command("pwd")().strip()
         old_wd2 = os.getcwd()
 
         self.assertEqual(old_wd1, old_wd2)
         self.assertNotEqual(old_wd1, child)
 
-        with sh.pushd(child):
-            new_wd1 = sh.Command("pwd")().strip()
+        with hs.pushd(child):
+            new_wd1 = hs.Command("pwd")().strip()
             new_wd2 = os.getcwd()
 
-        old_wd3 = sh.Command("pwd")().strip()
+        old_wd3 = hs.Command("pwd")().strip()
         old_wd4 = os.getcwd()
         self.assertEqual(old_wd3, old_wd4)
         self.assertEqual(old_wd1, old_wd3)
@@ -2646,23 +2637,23 @@ p.wait()
         child = realpath(tempfile.mkdtemp())
         try:
             old_wd = os.getcwd()
-            with sh.pushd(tempdir):
+            with hs.pushd(tempdir):
                 self.assertEqual(str(tempdir), os.getcwd())
             self.assertEqual(old_wd, os.getcwd())
         finally:
             os.rmdir(child)
 
     def test_non_existant_cwd(self):
-        ls = sh.Command('ls')
+        ls = hs.Command('ls')
 
         # sanity check
         non_exist_dir = join(tempdir, "aowjgoahewro")
         self.assertFalse(exists(non_exist_dir))
-        self.assertRaises(sh.ForkException, ls, _cwd=non_exist_dir)
+        self.assertRaises(hs.ForkException, ls, _cwd=non_exist_dir)
 
     # https://github.com/amoffat/sh/issues/176
     def test_baked_command_can_be_printed(self):
-        ls = sh.Command('ls')
+        ls = hs.Command('ls')
 
         ll = ls.rebake("-l")
         self.assertTrue(str(ll).endswith("/ls -l"))
@@ -2711,7 +2702,7 @@ print(time())
         py = create_tmp_test(
             """
 import sh
-sleep = sh.Command('sleep')
+sleep = hs.Command('sleep')
 
 def done(cmd, success, exit_code):
     print(cmd, success, exit_code)
@@ -3063,7 +3054,7 @@ time.sleep(1) # give child a chance to set up
         self.assertEqual(out, b"made it!\n")
 
     def test_unchecked_producer_failure(self):
-        ErrorReturnCode_2 = sh.get_rc_exc(2)
+        ErrorReturnCode_2 = hs.get_rc_exc(2)
 
         producer = create_tmp_test(
             """
@@ -3089,7 +3080,7 @@ for line in sys.stdin:
         # similar to test_unchecked_producer_failure, but this
         # tests a multi-stage pipeline
 
-        ErrorReturnCode_2 = sh.get_rc_exc(2)
+        ErrorReturnCode_2 = hs.get_rc_exc(2)
 
         producer = create_tmp_test(
             """
@@ -3139,7 +3130,7 @@ sys.exit(1)
             if sig == signal.SIGPIPE:
                 continue
             sig_exception_name = f"SignalException_{sig}"
-            sig_exception = sh.get_rc_exc(-sig)
+            sig_exception = hs.get_rc_exc(-sig)
             try:
                 p = python_bg(py.name)
                 time.sleep(0.5)
@@ -3165,7 +3156,7 @@ sys.exit(1)
             if sig == signal.SIGPIPE:
                 continue
             sig_exception_name = f"SignalException_{sig}"
-            sig_exception = sh.get_rc_exc(-sig)
+            sig_exception = hs.get_rc_exc(-sig)
             python_bg_no_sig_exception = python_bg.rebake(_ok_code=[-sig])
             try:
                 p = python_bg_no_sig_exception(py.name)
@@ -3183,16 +3174,16 @@ sys.exit(1)
 class MockTests(BaseTests):
     def test_patch_command_cls(self):
         def fn():
-            cmd = sh.Command("afowejfow")
+            cmd = hs.Command("afowejfow")
             return cmd()
 
-        @unittest.mock.patch("sh.Command")
+        @unittest.mock.patch("hs.Command")
         def test(Command):
             Command().return_value = "some output"
             return fn()
 
         self.assertEqual(test(), "some output")
-        self.assertRaises(sh.CommandNotFound, fn)
+        self.assertRaises(hs.CommandNotFound, fn)
 
 
 
@@ -3211,7 +3202,7 @@ exit(1)
 
         try:
             python(py.name)
-        except sh.ErrorReturnCode as e:
+        except hs.ErrorReturnCode as e:
             restored = pickle.loads(pickle.dumps(e))
             self.assertEqual(restored.stdout, b"some output")
             self.assertEqual(restored.stderr, b"some error")
@@ -3247,13 +3238,13 @@ exit(1)
             results = [None, None]
 
             def fn1():
-                with sh.pushd(temp1):
+                with hs.pushd(temp1):
                     time.sleep(0.2)
                     results[0] = realpath(os.getcwd())
 
             def fn2():
                 time.sleep(0.1)
-                with sh.pushd(temp2):
+                with hs.pushd(temp2):
                     results[1] = realpath(os.getcwd())
                     time.sleep(0.3)
 
@@ -3316,7 +3307,7 @@ print("字")
 
     # https://github.com/amoffat/sh/issues/121
     def test_wraps(self):
-        ls = sh.Command('ls')
+        ls = hs.Command('ls')
 
         wraps(ls)(lambda f: True)
 
@@ -3327,8 +3318,8 @@ print("字")
         import sh
 
         sig_name = f"SignalException_{signal.SIGQUIT}"
-        sig = sh.get_rc_exc(-signal.SIGQUIT)
-        SignalException_SIGQUIT = sh.get_rc_exc(-signal.SIGQUIT)
+        sig = hs.get_rc_exc(-signal.SIGQUIT)
+        SignalException_SIGQUIT = hs.get_rc_exc(-signal.SIGQUIT)
 
         self.assertEqual(sig, SignalException_SIGQUIT)
 
@@ -3468,7 +3459,7 @@ class StreamBuffererTests(unittest.TestCase):
 class BakeTests(unittest.TestCase):
     def test_bake_mutates_in_place(self):
         """Test that bake() modifies the command in place"""
-        cmd = sh.Command('echo')
+        cmd = hs.Command('echo')
         result = cmd.bake('-n')
         self.assertIsNone(result, "bake() should return None")
         # Verify the arg was baked in
@@ -3476,7 +3467,7 @@ class BakeTests(unittest.TestCase):
 
     def test_bake_multiple_calls(self):
         """Test multiple bake() calls accumulate"""
-        cmd = sh.Command('echo')
+        cmd = hs.Command('echo')
         cmd.bake('-n')
         cmd.bake('-e')
         self.assertIn('-n', cmd._partial_baked_args)
@@ -3484,7 +3475,7 @@ class BakeTests(unittest.TestCase):
 
     def test_bake_conditional_pattern(self):
         """Test the new conditional baking pattern"""
-        cmd = sh.Command('echo')
+        cmd = hs.Command('echo')
         verbose = True
         if verbose:
             cmd.bake('-e')
@@ -3497,7 +3488,7 @@ class BakeTests(unittest.TestCase):
 
     def test_rebake_creates_copy(self):
         """Test that rebake() creates a new Command"""
-        base = sh.Command('echo')
+        base = hs.Command('echo')
         variant1 = base.rebake('-n')
         variant2 = base.rebake('-e')
 

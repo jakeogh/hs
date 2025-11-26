@@ -43,8 +43,6 @@ if "windows" in platform.system().lower():  # pragma: no cover
 import errno
 import fcntl
 import gc
-import getpass
-import glob as glob_module
 import inspect
 import logging
 import os
@@ -62,7 +60,6 @@ import threading
 import time
 import traceback
 import tty
-import warnings
 import weakref
 from asyncio import Queue as AQueue
 from contextlib import contextmanager
@@ -76,7 +73,6 @@ from queue import Empty
 from queue import Queue
 from shlex import quote as shlex_quote
 from types import GeneratorType
-from types import ModuleType
 from typing import Any
 
 __project_url__ = "https://github.com/amoffat/sh"
@@ -481,45 +477,6 @@ def get_rc_exc(rc: int) -> type[ErrorReturnCode]:
     )
     rc_exc_cache[rc] = exc
     return exc
-
-
-# we monkey patch glob.  i'm normally generally against monkey patching, but i
-# decided to do this really un-intrusive patch because we need a way to detect
-# if a list that we pass into an sh command was generated from glob.  the reason
-# being that glob returns an empty list if a pattern is not found, and so
-# commands will treat the empty list as no arguments, which can be a problem,
-# ie:
-#
-#   ls(glob("*.ojfawe"))
-#
-# ^ will show the contents of your home directory, because it's essentially
-# running ls([]) which, as a process, is just "ls".
-#
-# so we subclass list and monkey patch the glob function.  nobody should be the
-# wiser, but we'll have results that we can make some determinations on
-_old_glob = glob_module.glob
-
-
-class GlobResults(list):
-    def __init__(
-        self,
-        path,
-        results,
-    ):
-        self.path = path
-        list.__init__(self, results)
-
-
-def glob(
-    path: str,
-    *args: Any,
-    **kwargs: Any,
-) -> list[str]:
-    expanded = GlobResults(path, _old_glob(path, *args, **kwargs))
-    return expanded
-
-
-glob_module.glob = glob  # type: ignore
 
 
 def canonicalize(path: str) -> str:
@@ -1690,9 +1647,6 @@ def compile_args(
     # aggregate positional args
     for arg in a:
         if isinstance(arg, (list, tuple)):
-            if isinstance(arg, GlobResults) and not arg:
-                arg = [arg.path]
-
             for sub_arg in arg:
                 processed_args.append(sub_arg)
         elif isinstance(arg, dict):
@@ -3608,8 +3562,8 @@ def with_lock(lock):
 @with_lock(PUSHD_LOCK)
 def pushd(path):
     """pushd changes the actual working directory for the duration of the
-    context, unlike the _cwd arg this will work with other built-ins such as
-    sh.glob correctly"""
+    context, unlike the _cwd arg this will affect the actual working directory
+    for the duration of the context"""
     orig_path = os.getcwd()
     os.chdir(path)
     try:
