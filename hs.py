@@ -31,13 +31,13 @@ from collections.abc import Mapping
 from importlib import metadata
 
 try:
-    __version__ = metadata.version("sh")
+    __version__ = metadata.version("hs")
 except metadata.PackageNotFoundError:  # pragma: no cover
     __version__ = "unknown"
 
 if "windows" in platform.system().lower():  # pragma: no cover
     raise ImportError(
-        f"sh {__version__} is currently only supported on Linux and macOS."
+        f"hs {__version__} is currently only supported on Linux and macOS."
     )
 
 import errno
@@ -1382,8 +1382,7 @@ def special_kwarg_validator(
 
 
 def get_fileno(ob):
-    # in py2, this will return None.  in py3, it will return an method that
-    # raises when called
+    # getattr may return a method that raises when called
     fileno_meth = getattr(
         ob,
         "fileno",
@@ -1392,8 +1391,7 @@ def get_fileno(ob):
 
     fileno = None
     if fileno_meth:
-        # py3 StringIO objects will report a fileno, but calling it will raise
-        # an exception
+        # getattr may return a method that raises when called
         try:
             fileno = fileno_meth()
         except UnsupportedOperation:
@@ -2560,9 +2558,7 @@ class OProc:
                     try:
                         inherited_fds = os.listdir("/dev/fd")
                     except OSError:
-                        # Some systems don't have /dev/fd. Raises OSError in
-                        # Python2, FileNotFoundError on Python3. The latter doesn't
-                        # exist on Python2, but inherits from IOError, which does.
+                        # Some systems don't have /dev/fd
                         inherited_fds = os.listdir("/proc/self/fd")
                     inherited_fds = {int(fd) for fd in inherited_fds} - pass_fds
                     for fd in inherited_fds:
@@ -3499,11 +3495,9 @@ def determine_how_to_feed_output(
             decode_errors,
         )
 
-    # in py3, this is used for bytes
     elif isinstance(handler, BytesIO):
-        process, finish = get_cstringio_chunk_consumer(handler)
+        process, finish = get_bytesio_chunk_consumer(handler)
 
-    # in py3, this is used for unicode
     elif isinstance(handler, StringIO):
         process, finish = get_stringio_chunk_consumer(
             handler,
@@ -3520,10 +3514,10 @@ def determine_how_to_feed_output(
         except (ValueError, TypeError):
 
             def process(chunk):
-                return False  # noqa: E731
+                return False
 
             def finish():
-                return None  # noqa: E731
+                return None
 
         else:
             process, finish = get_fd_chunk_consumer(handler, decode_errors)
@@ -3595,7 +3589,7 @@ def get_callback_chunk_consumer(
     return process, finish
 
 
-def get_cstringio_chunk_consumer(handler):
+def get_bytesio_chunk_consumer(handler):
     def process(chunk):
         handler.write(chunk)
         return False
@@ -3759,7 +3753,6 @@ class StreamBufferer:
         self.log = Logger("stream_bufferer")
 
     def change_buffering(self, new_type):
-        # TODO, when we stop supporting 2.6, make this a with context
         self.log.debug("acquiring buffering lock for changing buffering")
         self._buffering_lock.acquire()
         self.log.debug("got buffering lock for changing buffering")
@@ -3773,10 +3766,7 @@ class StreamBufferer:
             self.log.debug("released buffering lock for changing buffering")
 
     def process(self, chunk):
-        # MAKE SURE THAT THE INPUT IS PY3 BYTES
-        # THE OUTPUT IS ALWAYS PY3 BYTES
-
-        # TODO, when we stop supporting 2.6, make this a with context
+        # Input and output are both bytes
         self.log.debug(
             "acquiring buffering lock to process chunk (buffering: %d)", self.type
         )
