@@ -1570,7 +1570,7 @@ for i in range(5):
                 process.terminate()
                 return True
 
-        import sh
+        import hs
 
         SignalException_SIGTERM = hs.get_rc_exc(-signal.SIGTERM)
         caught_signal = False
@@ -1609,7 +1609,7 @@ for i in range(5):
                 process.kill()
                 return True
 
-        import sh
+        import hs
         SignalException_SIGKILL = hs.get_rc_exc(-signal.SIGKILL)
         caught_signal = False
         try:
@@ -2134,7 +2134,7 @@ exit(49)
         td = realpath(tempfile.mkdtemp())
         py = create_tmp_test(
             f"""
-import sh
+import hs
 import os
 from os.path import realpath
 orig = realpath(os.getcwd())
@@ -2227,7 +2227,7 @@ else:
         self.assertEqual(out, "no tty attached")
 
     def test_stringio_output(self):
-        import sh
+        import hs
 
         py = create_tmp_test(
             """
@@ -2342,7 +2342,7 @@ sys.stdout.write("line1")
     def test_timeout(self):
         from time import time
 
-        import sh
+        import hs
 
         sleep_for = 3
         timeout = 1
@@ -2557,7 +2557,7 @@ time.sleep(3)
         parent = create_tmp_test(
             """
 import sys
-import sh
+import hs
 python = hs.Command(sys.executable)
 p = python("{child_file}", _bg=True, _new_session=False)
 print(p.pid)
@@ -2701,7 +2701,7 @@ print(time())
 
         py = create_tmp_test(
             """
-import sh
+import hs
 sleep = hs.Command('sleep')
 
 def done(cmd, success, exit_code):
@@ -3315,7 +3315,7 @@ print("字")
         """proves that signal exceptions with numbers and names are equivalent"""
         import signal
 
-        import sh
+        import hs
 
         sig_name = f"SignalException_{signal.SIGQUIT}"
         sig = hs.get_rc_exc(-signal.SIGQUIT)
