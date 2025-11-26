@@ -870,7 +870,7 @@ print(int(sys.stdin.read()) + 1)
         self.assertEqual("17", res)
 
     def test_short_option(self):
-        sh_cmd = hs.Command('hs')
+        sh_cmd = hs.Command('sh')
 
         s1 = sh_cmd(c="echo test").strip()
         s2 = "test"
