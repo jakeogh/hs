@@ -3320,9 +3320,8 @@ def get_file_chunk_reader(stdin):
     bufsize = 1024
 
     def fn():
-        # python 3.* includes a fileno on stringios, but accessing it throws an
-        # exception.  that exception is how we'll know we can't do a poll on
-        # stdin
+        # StringIO/BytesIO have a fileno attribute, but calling it raises
+        # UnsupportedOperation. We use this to detect non-pollable streams.
         is_real_file = True
         try:
             stdin.fileno()
@@ -3423,22 +3422,6 @@ class StreamWriter:
                 except Exception:
                     char = chr(4).encode()
 
-                # normally, one EOF should be enough to signal to an program
-                # that is read()ing, to return 0 and be on your way.  however,
-                # some programs are misbehaved, like python3.1 and python3.2.
-                # they don't stop reading sometimes after read() returns 0.
-                # this can be demonstrated with the following program:
-                #
-                # import sys
-                # sys.stdout.write(sys.stdin.read())
-                #
-                # then type 'a' followed by ctrl-d 3 times.  in python
-                # 2.6,2.7,3.3,3.4,3.5,3.6, it only takes 2 ctrl-d to terminate.
-                # however, in python 3.1 and 3.2, it takes all 3.
-                #
-                # so here we send an extra EOF along, just in case.  i don't
-                # believe it can hurt anything
-                os.write(self.stream, char)
                 os.write(self.stream, char)
 
             return True
@@ -3542,19 +3525,19 @@ def get_file_chunk_consumer(handler, decode_errors):
     ):
 
         def encode(chunk):
-            return chunk.decode(handler.encoding, decode_errors)  # noqa: E731
+            return chunk.decode(handler.encoding, decode_errors)
 
     else:
 
         def encode(chunk):
-            return chunk  # noqa: E731
+            return chunk
 
     if hasattr(handler, "flush"):
         flush = handler.flush
     else:
 
         def flush():
-            return None  # noqa: E731
+            return None
 
     def process(chunk):
         handler.write(encode(chunk))
@@ -3681,8 +3664,6 @@ class StreamReader:
         os.close(self.stream)
 
     def write_chunk(self, chunk):
-        # in PY3, the chunk coming in will be bytes, so keep that in mind
-
         if not self.should_quit:
             self.should_quit = self.process_chunk(chunk)
 
@@ -3694,8 +3675,6 @@ class StreamReader:
                 self.pipe_queue().put(chunk)
 
     def read(self):
-        # if we're PY3, we're reading bytes, otherwise we're reading
-        # str
         try:
             chunk = no_interrupt(
                 os.read,
