@@ -227,7 +227,7 @@ class FunctionalTests(BaseTests):
         self.assertEqual(test, output)
 
     def test_unicode_exception(self):
-        from sh import ErrorReturnCode
+        from hs import ErrorReturnCode
 
         py = create_tmp_test("exit(1)")
 
@@ -736,7 +736,7 @@ exit(2)
         self.assertRaises(ErrorReturnCode_2, fn)
 
     def test_command_not_found(self):
-        from sh import CommandNotFound
+        from hs import CommandNotFound
 
         # Test that Command() raises CommandNotFound for non-existent commands
         def create_nonexistent_command():
@@ -750,7 +750,7 @@ exit(2)
         self.assertRaises(CommandNotFound, create_another_nonexistent)
 
     def test_command_wrapper_equivalence(self):
-        from sh import Command
+        from hs import Command
         ls = hs.Command('ls')
         which = hs.Command('which')
 
@@ -1003,7 +1003,7 @@ print(sys.argv[1])
         self.assertEqual(out, "-baked-long-option")
 
     def test_command_wrapper(self):
-        from sh import Command
+        from hs import Command
         which = hs.Command('which')
 
         ls = Command(str(which("ls")).strip())
@@ -2416,7 +2416,7 @@ exit(1)
     # designed to check if the ErrorReturnCode constructor does not raise
     # an UnicodeDecodeError
     def test_non_ascii_error(self):
-        from sh import ErrorReturnCode
+        from hs import ErrorReturnCode
         ls = hs.Command('ls')
 
         test = "/á"
@@ -2722,7 +2722,7 @@ sleep('1', _done=done)
         self.assertLess(abs(wait_elapsed - 1.0), 1.0)
 
     def test_fork_exc(self):
-        from sh import ForkException
+        from hs import ForkException
 
         py = create_tmp_test("")
 
@@ -2806,7 +2806,7 @@ time.sleep(0.5)
         event.clear()
 
     def test_done_cb_exc(self):
-        from sh import ErrorReturnCode
+        from hs import ErrorReturnCode
 
         class Callback:
             def __init__(self):
@@ -2944,7 +2944,7 @@ sys.stdout.flush()
     def test_custom_timeout_signal(self):
         import signal
 
-        from sh import TimeoutException
+        from hs import TimeoutException
 
         py = create_tmp_test(
             """
@@ -3274,7 +3274,7 @@ print("hi")
 
     @requires_utf8
     def test_unicode_path(self):
-        from sh import Command
+        from hs import Command
 
         python_name = os.path.basename(sys.executable)
         py = create_tmp_test(
@@ -3428,7 +3428,7 @@ time.sleep(2)
 
 class StreamBuffererTests(unittest.TestCase):
     def test_unbuffered(self):
-        from sh import StreamBufferer
+        from hs import StreamBufferer
 
         b = StreamBufferer(0)
 
@@ -3438,7 +3438,7 @@ class StreamBuffererTests(unittest.TestCase):
         self.assertEqual(b.flush(), b"")
 
     def test_newline_buffered(self):
-        from sh import StreamBufferer
+        from hs import StreamBufferer
 
         b = StreamBufferer(1)
 
@@ -3447,7 +3447,7 @@ class StreamBuffererTests(unittest.TestCase):
         self.assertEqual(b.flush(), b"four")
 
     def test_chunk_buffered(self):
-        from sh import StreamBufferer
+        from hs import StreamBufferer
 
         b = StreamBufferer(10)
 
