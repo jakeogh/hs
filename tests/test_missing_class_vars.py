@@ -4,7 +4,7 @@ import signal
 import sys
 sys.path.insert(0, '.')
 
-import sh
+import hs
 
 
 def test_signal_exception_module_getattr():
@@ -14,12 +14,12 @@ def test_signal_exception_module_getattr():
     but not SignalException_ prefix, despite get_exc_from_name() supporting both.
     """
     # ErrorReturnCode_ works (control case)
-    exc1 = sh.ErrorReturnCode_1
+    exc1 = hs.ErrorReturnCode_1
     assert exc1.exit_code == 1
 
     # SignalException_ by number should work but doesn't
     try:
-        exc_sig9 = sh.SignalException_9
+        exc_sig9 = hs.SignalException_9
         assert exc_sig9.exit_code == -9
     except AttributeError as e:
         raise AssertionError(
@@ -28,7 +28,7 @@ def test_signal_exception_module_getattr():
 
     # SignalException_ by name should work but doesn't
     try:
-        exc_sigterm = sh.SignalException_SIGTERM
+        exc_sigterm = hs.SignalException_SIGTERM
         assert exc_sigterm.exit_code == -signal.SIGTERM
     except AttributeError as e:
         raise AssertionError(
