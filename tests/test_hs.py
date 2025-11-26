@@ -737,7 +737,7 @@ exit(2)
             # discovered by internal which(1)-clone
             os.makedirs(gcc_dir1)
             # an executable named gcc -- only this should be executed
-            bunk_header = "#!/bin/hs\necho $*"
+            bunk_header = "#!/bin/sh\necho $*"
             with open(gcc_file2, "w") as h:
                 h.write(bunk_header)
             os.chmod(gcc_file2, int(0o755))
