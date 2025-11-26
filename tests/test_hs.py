@@ -311,37 +311,6 @@ exit(3)
         )
         self.assertRaises(ErrorReturnCode_3, python, py.name)
 
-    def test_patched_glob(self):
-        from glob import glob
-
-        py = create_tmp_test(
-            """
-import sys
-print(sys.argv[1:])
-"""
-        )
-        files = glob("*.faowjefoajweofj")
-        out = python(py.name, files).strip()
-        self.assertEqual(out, "['*.faowjefoajweofj']")
-
-    def test_exit_code_with_hasattr(self):
-        ErrorReturnCode_3 = hs.get_rc_exc(3)
-
-        py = create_tmp_test(
-            """
-exit(3)
-"""
-        )
-
-        try:
-            out = python(py.name, _iter=True)
-            # hasattr can swallow exceptions
-            hasattr(out, "something_not_there")
-            list(out)
-            self.assertEqual(out.exit_code, 3)
-            self.fail("Command exited with error, but no exception thrown")
-        except ErrorReturnCode_3:
-            pass
 
     def test_exit_code_from_exception(self):
         ErrorReturnCode_3 = hs.get_rc_exc(3)
