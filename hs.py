@@ -1894,7 +1894,7 @@ class Command:
                 call_args["piped"],
             )
             if exc_class:
-                ran = " ".join(cmd)
+                ran = " ".join([shlex_quote(str(arg)) for arg in cmd])
                 exc = exc_class(
                     ran,
                     b"",
