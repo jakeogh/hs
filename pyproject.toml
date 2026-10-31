@@ -1,59 +1,35 @@
-[tool.poetry]
+[project]
 name = "hs"
-version = "2.2.2"
-description = "Python subprocess replacement"
-authors = ["Andrew Moffat <arwmoffat@gmail.com>"]
+version = "1!0.0.1793488200"
+description = "Python subprocess launching: a fork of sh with a mutating bake"
 readme = "README.rst"
-maintainers = [
-    "Andrew Moffat <arwmoffat@gmail.com>",
-    "Erik Cederstrand <erik@cederstrand.dk>",
-]
-homepage = "https://sh.readthedocs.io/"
-repository = "https://github.com/amoffat/sh"
-documentation = "https://sh.readthedocs.io/"
 license = "MIT"
+license-files = ["LICENSE.txt"]
+requires-python = ">=3.12"
+authors = [{ name = "Andrew Moffat", email = "arwmoffat@gmail.com" }]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
-    "Topic :: Software Development :: Build Tools",
     "Topic :: Software Development :: Libraries :: Python Modules",
-]
-include = [
-    { path = "CHANGELOG.md", format = "sdist" },
-    { path = "MIGRATION.md", format = "sdist" },
-    { path = "images", format = "sdist" },
-    { path = "Makefile", format = "sdist" },
-    { path = "tests", format = "sdist" },
-    { path = "tox.ini", format = "sdist" },
-    { path = "LICENSE.txt", format = "sdist" },
-    { path = "py.typed" },
+    "Typing :: Typed",
 ]
 
-[tool.poetry.dependencies]
-python = ">=3.8.1,<4.0"
+[project.urls]
+Homepage = "https://github.com/jakeogh/hs"
+Upstream = "https://github.com/amoffat/sh"
 
 [tool.poetry.group.dev.dependencies]
-tox = "^4.6.4"
-black = "^23.7.0"
-coverage = "^7.2.7"
-flake8 = "^6.1.0"
-rstcheck = "^6.1.2"
-sphinx = ">=1.6,<7"
-sphinx-rtd-theme = "^1.2.2"
-pytest = "^7.4.0"
-mypy = "^1.4.1"
-toml = "^0.10.2"
+pytest = ">=8"
+pytest-randomly = ">=3"
+pylint = ">=3"
 
 [build-system]
-requires = ["poetry-core>=1.0.0a5"]
+requires = ["poetry-core>=2.0"]
 build-backend = "poetry.core.masonry.api"

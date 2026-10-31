@@ -989,14 +989,12 @@ class RunningCommand:
         # then later set it to True if we need it
         self._force_noblock_iter = False
 
-        # this event is used when we want to `await` a RunningCommand. see how it gets
-        # used in self.__await__
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            self.aio_output_complete = None
-        else:
-            self.aio_output_complete = asyncio.Event()
+        # set by the output thread as it ends. a coroutine that awaits this command
+        # registers here with its own loop and is woken on it (self.__await__); a
+        # command nobody awaits touches no loop, whatever loop ran when it started
+        self._output_lock = threading.Lock()
+        self._output_done = False
+        self._output_waiters: list[tuple[asyncio.AbstractEventLoop, asyncio.Event]] = []
 
         # this is used to track if we've already raised StopIteration, and if we
         # have, raise it immediately again if the user tries to call next() on
@@ -1243,9 +1241,34 @@ class RunningCommand:
                 except UnicodeDecodeError:
                     return chunk
 
+    def _output_finished(self):
+        """Called by the output thread as it ends: every coroutine awaiting the
+        command is woken, each on its own loop. Under the lock, so a waiter
+        cancelled as its loop shuts down is either woken here before the loop
+        closes or has taken itself off the list."""
+        with self._output_lock:
+            self._output_done = True
+            for loop, event in self._output_waiters:
+                loop.call_soon_threadsafe(event.set)
+            self._output_waiters = []
+
+    async def _output_complete(self):
+        event = asyncio.Event()
+        entry = (asyncio.get_running_loop(), event)
+        with self._output_lock:
+            if self._output_done:
+                return
+            self._output_waiters.append(entry)
+        try:
+            await event.wait()
+        finally:
+            with self._output_lock:
+                if entry in self._output_waiters:
+                    self._output_waiters.remove(entry)
+
     def __await__(self):
         async def wait_for_completion():
-            await self.aio_output_complete.wait()
+            await self._output_complete()
             if self.call_args["return_cmd"]:
                 # We know the command has completed already,
                 # but need to catch exceptions
@@ -2848,23 +2871,6 @@ class OProc:
             # prevents that hanging
             self._stop_output_event = threading.Event()
 
-            # we need to set up a callback to fire when our `output_thread` is about
-            # to exit. this callback will set an asyncio Event, so that coroutiens can
-            # be notified that our output is finished.
-            # if the `sh` command was launched from within a thread (so we're not in
-            # the main thread), then we won't have an event loop.
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-
-                def output_complete():
-                    pass
-
-            else:
-
-                def output_complete():
-                    loop.call_soon_threadsafe(self.command.aio_output_complete.set)
-
             self._output_thread_exc_queue = Queue(1)
             thread_name = f"STDOUT/ERR thread for pid {self.pid}"
             self._output_thread = _start_daemon_thread(
@@ -2878,7 +2884,7 @@ class OProc:
                 self.is_alive,
                 self._quit_threads,
                 self._stop_output_event,
-                output_complete,
+                self.command._output_finished,
             )
 
     def __repr__(self):

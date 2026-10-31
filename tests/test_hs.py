@@ -1770,6 +1770,47 @@ sys.exit(1)
 
         self.assertRaises(hs.get_rc_exc(1), asyncio.run, main())
 
+    def test_bg_started_in_loop_outlives_it(self):
+        py = create_tmp_test(
+            """
+import time
+time.sleep(0.5)
+"""
+        )
+
+        async def start():
+            return python(py.name, _bg=True)
+
+        p = asyncio.run(start())
+        p.wait()
+        p.process._output_thread.join()
+        self.assertTrue(p.process._output_thread_exc_queue.empty())
+
+    def test_async_waiter_cancelled_as_loop_closes(self):
+        py = create_tmp_test(
+            """
+import time
+time.sleep(0.5)
+"""
+        )
+        started = []
+
+        async def wait(p):
+            await p
+
+        async def main():
+            p = python(py.name, _async=True)
+            started.append(p)
+            asyncio.create_task(wait(p))
+            await asyncio.sleep(0.05)
+
+        asyncio.run(main())
+        p = started[0]
+        p.wait()
+        p.process._output_thread.join()
+        self.assertTrue(p.process._output_thread_exc_queue.empty())
+        self.assertEqual(p._output_waiters, [])
+
     def test_handle_both_out_and_err(self):
         py = create_tmp_test(
             """
