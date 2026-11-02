@@ -1498,31 +1498,29 @@ _fg is invalid with nearly every other option, see warning and workaround here:
     return invalid
 
 
+def tee_streams(tee):
+    """(stdout, stderr): which of the two the tee argument keeps a copy of."""
+    if isinstance(tee, (str, bool, int)) or tee is None:
+        tee = {tee}
+    else:
+        tee = set(tee)
+    return bool(TEE_STDOUT.intersection(tee)), bool(TEE_STDERR.intersection(tee))
+
+
 def bufsize_validator(passed_kwargs, merged_kwargs):
     """a validator to prevent a user from saying that they want custom
-    buffering when they're using an in/out object that will be os.dup'ed to the
-    process, and has its own buffering.  an example is a pipe or a tty.  it
+    buffering when they're using an in/out/err object that will be os.dup'ed to
+    the process, and has its own buffering.  an example is a pipe or a tty.  it
     doesn't make sense to tell them to have a custom buffering, since the os
-    controls this."""
+    controls this. a tee'd stream is not dup'ed: it is read here and written to
+    its target, so its buffering is ours to set."""
     invalid = []
-
-    in_ob = passed_kwargs.get("in", None)
-    out_ob = passed_kwargs.get("out", None)
-
-    in_buf = passed_kwargs.get("in_bufsize", None)
-    out_buf = passed_kwargs.get("out_bufsize", None)
-
-    in_no_buf = ob_is_fd_based(in_ob)
-    out_no_buf = ob_is_fd_based(out_ob)
-
+    tee_out, tee_err = tee_streams(merged_kwargs["tee"])
     err = "Can't specify an {target} bufsize if the {target} target is a pipe or TTY"
-
-    if in_no_buf and in_buf is not None:
-        invalid.append((("in", "in_bufsize"), err.format(target="in")))
-
-    if out_no_buf and out_buf is not None:
-        invalid.append((("out", "out_bufsize"), err.format(target="out")))
-
+    for target, teed in (("in", False), ("out", tee_out), ("err", tee_err)):
+        dup_ed = ob_is_fd_based(passed_kwargs.get(target, None)) and not teed
+        if dup_ed and passed_kwargs.get(f"{target}_bufsize", None) is not None:
+            invalid.append(((target, f"{target}_bufsize"), err.format(target=target)))
     return invalid
 
 
@@ -2326,12 +2324,7 @@ class OProc:
         stdout_is_fd_based = ob_is_fd_based(stdout)
         stderr_is_fd_based = ob_is_fd_based(stderr)
 
-        if isinstance(ca["tee"], (str, bool, int)) or ca["tee"] is None:
-            tee = {ca["tee"]}
-        else:
-            tee = set(ca["tee"])
-        tee_out = TEE_STDOUT.intersection(tee)
-        tee_err = TEE_STDERR.intersection(tee)
+        tee_out, tee_err = tee_streams(ca["tee"])
 
         single_tty = ca["tty_in"] and ca["tty_out"] and ca["unify_ttys"]
 

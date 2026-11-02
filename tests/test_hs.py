@@ -7,6 +7,7 @@ import os
 import platform
 import pty
 import resource
+import select
 import signal
 import stat
 import sys
@@ -2263,6 +2264,47 @@ sys.stdout.write(sys.argv[1])
 
         out = cat(_in=input)
         self.assertEqual(out, "herpderp")
+
+    def test_teed_fd_out_takes_a_bufsize(self):
+        # a tee'd stdout is read here and written to its fd target, not dup'ed
+        # to the process, so its buffering is ours: unbuffered, a partial line
+        # reaches the target before its newline does
+        py = create_tmp_test(
+            """
+import sys
+import time
+sys.stdout.write("partial")
+sys.stdout.flush()
+time.sleep(2)
+sys.stdout.write(" line\\n")
+"""
+        )
+        read_fd, write_fd = os.pipe()
+        with os.fdopen(read_fd, "rb", buffering=0) as reader:
+            with os.fdopen(write_fd, "wb", buffering=0) as target:
+                p = python("-u", py.name, _out=target, _tee="out", _out_bufsize=0, _tty_out=False, _bg=True)
+                arrived = b""
+                deadline = time.monotonic() + 1.5
+                while arrived != b"partial" and select.select([reader], [], [], deadline - time.monotonic())[0]:
+                    arrived += os.read(read_fd, 64)
+                self.assertEqual(arrived, b"partial")
+                p.wait()
+        self.assertEqual(p.stdout, b"partial line\n")
+
+    def test_teed_fd_err_takes_a_bufsize(self):
+        read_fd, write_fd = os.pipe()
+        with os.fdopen(read_fd, "rb", buffering=0) as reader:
+            with os.fdopen(write_fd, "wb", buffering=0) as target:
+                p = python("-c", "import sys; sys.stderr.write('e')", _err=target, _tee="err", _err_bufsize=0)
+            self.assertEqual(reader.read(), b"e")
+        self.assertEqual(p.stderr, b"e")
+
+    def test_dup_ed_fd_targets_refuse_a_bufsize(self):
+        read_fd, write_fd = os.pipe()
+        with os.fdopen(read_fd, "rb"), os.fdopen(write_fd, "wb") as target:
+            self.assertRaises(TypeError, python, "-c", "pass", _out=target, _out_bufsize=0)
+            self.assertRaises(TypeError, python, "-c", "pass", _err=target, _err_bufsize=0)
+            self.assertRaises(TypeError, python, "-c", "pass", _out=target, _tee="err", _out_bufsize=0)
 
     def test_internal_bufsize(self):
         cat = hs.Command('cat')

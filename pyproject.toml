@@ -1,6 +1,6 @@
 [project]
 name = "hs"
-version = "1!0.0.1793488200"
+version = "1!0.0.1793592899"
 description = "Python subprocess launching: a fork of sh with a mutating bake"
 readme = "README.rst"
 license = "MIT"
