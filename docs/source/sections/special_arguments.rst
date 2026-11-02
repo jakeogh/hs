@@ -462,7 +462,8 @@ _out_bufsize
 |def| ``1``
 
 The STDOUT buffer size.  0 for unbuffered, 1 for line buffered, anything
-else for a buffer of that amount.
+else for a buffer of that amount.  Unbuffered output reaches its handler as it
+arrives, in the pieces the process wrote it in.
 
 .. _err_bufsize:
 
@@ -481,8 +482,8 @@ _internal_bufsize
 How much of STDOUT/ERR your command will store internally.  This value
 represents the *number of bufsize chunks* not the total number of bytes.  For
 example, if this value is 100, and STDOUT is line buffered, you will be able to
-retrieve 100 lines from STDOUT.  If STDOUT is unbuffered, you will be able to
-retrieve only 100 characters.
+retrieve 100 lines from STDOUT.  If STDOUT is unbuffered, 100 chunks, each
+what one read of the process's output returned.
 		
 _no_out
 -------

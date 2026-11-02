@@ -3350,17 +3350,21 @@ def get_file_chunk_reader(stdin):
 
 
 def bufsize_type_to_bufsize(bf_type):
-    """for a given bufsize type, return the actual bufsize we will read.
-    notice that although 1 means "newline-buffered", we're reading a chunk size
-    of 1024.  this is because we have to read something.  we let a
-    StreamBufferer instance handle splitting our chunk on newlines"""
+    """how much one read of the process's output takes for a bufsize type.
+    the StreamBufferer sets what reaches the handler: for 1 it holds a line's
+    pieces until the newline, so the read size is invisible; for 0 it passes
+    each read through whole, so the read size is the most one chunk holds and
+    the finest the output thread can alternate stdout and stderr when both
+    are pending. unbuffered reads drain a pipe (64KiB on linux): reading a
+    byte at a time alternated single bytes of two streams aimed at one
+    target."""
 
     # newlines
     if bf_type == 1:
         bufsize = 1024
     # unbuffered
     elif bf_type == 0:
-        bufsize = 1
+        bufsize = 65536
     # or buffered by specific amount
     else:
         bufsize = bf_type

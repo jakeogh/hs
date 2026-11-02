@@ -1431,25 +1431,30 @@ for i in range(5): print("herpderp")
         self.assertEqual(len(stdout), 5)
 
     def test_stdout_callback_line_unbuffered(self):
+        # unbuffered, a partial line reaches the callback before its newline:
+        # the process holds the newline back until the callback has seen the
+        # start of the line
         py = create_tmp_test(
             """
 import sys
-import os
-
-for i in range(5): print("herpderp")
+sys.stdout.write("partial")
+sys.stdout.flush()
+sys.stdin.read(1)
+sys.stdout.write(" line\\n")
 """
         )
 
-        stdout = []
+        chunks = []
 
-        def agg(char):
-            stdout.append(char)
+        def agg(chunk, stdin):
+            chunks.append(chunk)
+            if "".join(chunks) == "partial":
+                stdin.put("a")
 
-        p = python("-u", py.name, _out=agg, _out_bufsize=0)
+        p = python("-u", py.name, _out=agg, _out_bufsize=0, _timeout=5)
         p.wait()
 
-        # + 5 newlines
-        self.assertEqual(len(stdout), len("herpderp") * 5 + 5)
+        self.assertEqual("".join(chunks), "partial line\n")
 
     def test_stdout_callback_buffered(self):
         py = create_tmp_test(
@@ -2309,8 +2314,8 @@ sys.stdout.write(" line\\n")
     def test_internal_bufsize(self):
         cat = hs.Command('cat')
 
-        output = cat(_in="a" * 1000, _internal_bufsize=100, _out_bufsize=0)
-        self.assertEqual(len(output), 100)
+        output = cat(_in="a\n" * 1000, _internal_bufsize=100, _out_bufsize=1)
+        self.assertEqual(len(output), 200)
 
         output = cat(_in="a" * 1000, _internal_bufsize=50, _out_bufsize=2)
         self.assertEqual(len(output), 100)
